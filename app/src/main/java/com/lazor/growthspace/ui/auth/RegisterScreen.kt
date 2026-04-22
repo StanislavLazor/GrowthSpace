@@ -1,8 +1,11 @@
 package com.lazor.growthspace.ui.auth
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,27 +42,26 @@ import com.lazor.growthspace.ui.theme.*
 @Composable
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
-    onBackClick: () -> Unit,
     onLoginClick: () -> Unit
 ) {
-    // Стейт для зберігання введених даних
+    // Базові стейти
     var name by remember { mutableStateOf("") }
     var surname by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
 
+    // Додаткові стейти для коуча
+    var specialization by remember { mutableStateOf("") }
+    var experience by remember { mutableStateOf("") }
+
     // Стейт для ролі та умов
     var isClientRole by remember { mutableStateOf(true) }
     var isTermsAccepted by remember { mutableStateOf(false) }
 
-    // 🔥 ЛОГІКА ВАЛІДАЦІЇ
-    // Регулярний вираз для перевірки правильного формату пошти (напр. test@gmail.com)
+    // Логіка валідації
     val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
-
-    // Помилка є, ТІЛЬКИ якщо поле не пусте І формат неправильний
     val isEmailError = email.isNotEmpty() && !email.matches(emailRegex)
-    // Помилка є, ТІЛЬКИ якщо поле не пусте І пароль коротший за 8 символів
     val isPasswordError = password.isNotEmpty() && password.length < 8
 
     Column(
@@ -115,23 +117,39 @@ fun RegisterScreen(
 
             Row(modifier = Modifier.fillMaxSize()) {
                 Box(
-                    modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(10.dp)).clickable { isClientRole = true },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { isClientRole = true },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "Клієнт", color = if (isClientRole) PrimaryBlue else TextGray, fontWeight = if (isClientRole) FontWeight.Bold else FontWeight.Normal)
+                    Text(
+                        text = "Клієнт",
+                        color = if (isClientRole) PrimaryBlue else TextGray,
+                        fontWeight = if (isClientRole) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
                 Box(
-                    modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(10.dp)).clickable { isClientRole = false },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { isClientRole = false },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "Коуч", color = if (!isClientRole) PrimaryBlue else TextGray, fontWeight = if (!isClientRole) FontWeight.Bold else FontWeight.Normal)
+                    Text(
+                        text = "Коуч",
+                        color = if (!isClientRole) PrimaryBlue else TextGray,
+                        fontWeight = if (!isClientRole) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Поля вводу (Ім'я та Прізвище)
+        // Базові поля вводу (Ім'я та Прізвище)
         CustomTextField(
             value = name,
             onValueChange = { name = it },
@@ -148,41 +166,55 @@ fun RegisterScreen(
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ПОЛЕ EMAIL З ВАЛІДАЦІЄЮ
+        // Анімавона поля лише для коуча
+        AnimatedVisibility(
+            visible = !isClientRole,
+            enter = expandVertically(animationSpec = tween(300)),
+            exit = shrinkVertically(animationSpec = tween(300))
+        ) {
+            Column {
+                CustomTextField(
+                    value = specialization,
+                    onValueChange = { specialization = it },
+                    label = "Спеціалізація (напр., Бізнес-коуч)",
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, keyboardType = KeyboardType.Text)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                CustomTextField(
+                    value = experience,
+                    onValueChange = { experience = it },
+                    label = "Досвід роботи (років)",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number) // Тільки цифри
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        // Поле Email
         CustomTextField(
             value = email,
             onValueChange = { email = it },
             label = "Email",
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            isError = isEmailError // Передаємо стейт помилки
+            isError = isEmailError
         )
-        // Динамічний текст під полем Email
         if (isEmailError) {
-            Text(
-                text = "Невірний формат Email",
-                color = StatusCanceled, // Наш червоний колір з Color.kt
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 4.dp, start = 8.dp)
-            )
+            Text(text = "Невірний формат Email", color = StatusCanceled, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
         } else {
-            Text(
-                text = "Ми надішлемо вам лист для підтвердження",
-                color = TextGray,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 4.dp, start = 8.dp)
-            )
+            Text(text = "Ми надішлемо вам лист для підтвердження", color = TextGray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ПОЛЕ ПАРОЛЯ З ВАЛІДАЦІЄЮ
+        // Поле Пароля
         CustomTextField(
             value = password,
             onValueChange = { password = it },
             label = "Пароль",
             visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            isError = isPasswordError, // Передаємо стейт помилки
+            isError = isPasswordError,
             trailingIcon = {
                 val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                 IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
@@ -190,51 +222,35 @@ fun RegisterScreen(
                 }
             }
         )
-        // Динамічний текст під полем Пароля
         if (isPasswordError) {
-            Text(
-                text = "Пароль має містити мінімум 8 символів",
-                color = StatusCanceled,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 4.dp, start = 8.dp)
-            )
+            Text(text = "Пароль має містити мінімум 8 символів", color = StatusCanceled, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Чекбокс та умови
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        // Чекбокс
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Checkbox(
                 checked = isTermsAccepted,
                 onCheckedChange = { isTermsAccepted = it },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = PrimaryBlue,
-                    uncheckedColor = TextGray,
-                    checkmarkColor = TextWhite
-                )
+                colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue, uncheckedColor = TextGray, checkmarkColor = TextWhite)
             )
-
             val annotatedText = buildAnnotatedString {
                 append("Я погоджуюсь з ")
-                withStyle(style = SpanStyle(color = PrimaryBlue)) { append("Умовами") }
+                withStyle(style = SpanStyle(color = PrimaryBlue)) { append("Умовами користування") }
                 append(" та ")
-                withStyle(style = SpanStyle(color = PrimaryBlue)) { append("Політикою") }
+                withStyle(style = SpanStyle(color = PrimaryBlue)) { append("Політикою компанії") }
             }
             Text(text = annotatedText, fontSize = 12.sp, color = TextGray)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        val isBaseValid = name.isNotBlank() && surname.isNotBlank() && email.isNotBlank() && !isEmailError && password.isNotBlank() && !isPasswordError && isTermsAccepted
+        // Якщо коуч — + ще два поля, якщо клієнт — коучевські поля ігноруються (вважаються true)
+        val isCoachValid = if (!isClientRole) specialization.isNotBlank() && experience.isNotBlank() else true
 
-        // Кнопка активна тільки якщо всі поля не пусті, немає помилок у форматі, і стоїть галочка
-        val isFormValid = name.isNotBlank() &&
-                surname.isNotBlank() &&
-                email.isNotBlank() && !isEmailError &&
-                password.isNotBlank() && !isPasswordError &&
-                isTermsAccepted
+        val isFormValid = isBaseValid && isCoachValid
 
         PrimaryButton(
             text = "Зареєструватися",
@@ -244,20 +260,11 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Посилання на логін
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 32.dp, top = 24.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
+        Row(modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp, top = 24.dp), horizontalArrangement = Arrangement.Center) {
             Text(text = "Вже маєте акаунт? ", color = TextGray)
-            Text(
-                text = "Увійти",
-                color = PrimaryBlue,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable { onLoginClick() }
-            )
+            Text(text = "Увійти", color = PrimaryBlue, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onLoginClick() })
         }
     }
 }
@@ -265,9 +272,5 @@ fun RegisterScreen(
 @Preview(showBackground = true)
 @Composable
 fun RegisterScreenPreview() {
-    RegisterScreen(
-        onRegisterSuccess = {},
-        onBackClick = {},
-        onLoginClick = {}
-    )
+    RegisterScreen(onRegisterSuccess = {}, onLoginClick = {})
 }

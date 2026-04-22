@@ -38,9 +38,10 @@ fun CustomTextField(
         shape = RoundedCornerShape(12.dp),
         singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
-            // Колір тексту всередині
+            // Колір тексту
             focusedTextColor = TextWhite,
             unfocusedTextColor = TextWhite,
+            errorTextColor = TextWhite,
 
             // Колір фону поля
             focusedContainerColor = SurfaceDarkElevated,
@@ -48,12 +49,13 @@ fun CustomTextField(
             errorContainerColor = SurfaceDarkElevated,
 
             // Колір рамки
-            focusedBorderColor = PrimaryBlue, // Неоновий акцент при натисканні
-            unfocusedBorderColor = Color.Transparent, // У звичайному стані рамки не видно
-            errorBorderColor = StatusCanceled,
+            focusedBorderColor = PrimaryBlue,
+            unfocusedBorderColor = Color.Transparent,
+            errorBorderColor = StatusCanceled, // Червона рамка при помилці
 
             // Колір курсора
-            cursorColor = PrimaryBlue
+            cursorColor = PrimaryBlue,
+            errorCursorColor = StatusCanceled // Курсор теж стає червоним для краси
         )
     )
 }
