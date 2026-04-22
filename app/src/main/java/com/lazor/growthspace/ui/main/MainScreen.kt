@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.lazor.growthspace.navigation.Routes
+import com.lazor.growthspace.ui.home.HomeScreen
 import com.lazor.growthspace.ui.components.BottomNavigationBar
 
 @Composable
@@ -24,7 +25,7 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Routes.HOME) {
-                // Тут буде наш HomeScreen
+                HomeScreen()
             }
             composable("sessions") { }
             composable("chat") { }
