@@ -3,14 +3,13 @@ package com.lazor.growthspace.ui.components
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.lazor.growthspace.navigation.NavigationItem
 import com.lazor.growthspace.ui.theme.PrimaryBlue
 import com.lazor.growthspace.ui.theme.SurfaceDark
 import com.lazor.growthspace.ui.theme.TextGray
-import com.lazor.growthspace.ui.theme.TextWhite
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -23,8 +22,8 @@ fun BottomNavigationBar(navController: NavController) {
     )
 
     NavigationBar(
-        containerColor = SurfaceDark, // Використовуємо колір із нашої теми
-        tonalElevation = 8.dp
+        containerColor = SurfaceDark,
+        tonalElevation = 0.dp
     ) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
@@ -36,13 +35,10 @@ fun BottomNavigationBar(navController: NavController) {
                 selected = currentRoute == item.route,
                 onClick = {
                     navController.navigate(item.route) {
-                        // Повертаємося до стартового екрана графа, щоб не накопичувати стеки
                         navController.graph.startDestinationRoute?.let { route ->
                             popUpTo(route) { saveState = true }
                         }
-                        // Уникаємо створення копій одного і того ж екрана
                         launchSingleTop = true
-                        // Зберігаємо стан екрана при перемиканні
                         restoreState = true
                     }
                 },
@@ -51,7 +47,7 @@ fun BottomNavigationBar(navController: NavController) {
                     selectedTextColor = PrimaryBlue,
                     unselectedIconColor = TextGray,
                     unselectedTextColor = TextGray,
-                    indicatorColor = SurfaceDark // Прибираємо стандартне коло виділення або робимо його в колір фону
+                    indicatorColor = SurfaceDark
                 )
             )
         }

@@ -7,6 +7,7 @@ import androidx.navigation.compose.rememberNavController
 import com.lazor.growthspace.ui.auth.ForgotPasswordScreen
 import com.lazor.growthspace.ui.auth.LoginScreen
 import com.lazor.growthspace.ui.auth.RegisterScreen
+import com.lazor.growthspace.ui.main.MainScreen
 
 @Composable
 fun AppNavGraph() {
@@ -14,13 +15,16 @@ fun AppNavGraph() {
 
     NavHost(
         navController = navController,
-        startDestination = Routes.REGISTER // Починаємо з екрана входу
+        startDestination = Routes.REGISTER
     ) {
         // Екран Логіну
         composable(Routes.LOGIN) {
             LoginScreen(
                 onLoginSuccess = {
-                    // TODO: Сюди ми додамо перехід на головну пізніше
+                    // Перехід у додаток та очищення історії навігації (щоб не повернутися на логін)
+                    navController.navigate(Routes.MAIN_APP) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 },
                 onNavigateToRegister = {
                     navController.navigate(Routes.REGISTER)
@@ -35,28 +39,35 @@ fun AppNavGraph() {
         composable(Routes.REGISTER) {
             RegisterScreen(
                 onRegisterSuccess = {
-                    // TODO: Логіка після реєстрації
+                    // Перехід у додаток та очищення історії
+                    navController.navigate(Routes.MAIN_APP) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 },
-
 
                 onLoginClick = {
                     navController.navigate(Routes.LOGIN) {
-                        popUpTo(Routes.LOGIN) { inclusive = true }
+                        popUpTo(Routes.REGISTER) { inclusive = true }
                     }
                 }
             )
         }
 
+        // Екран відновлення пароля
         composable(Routes.FORGOT_PASSWORD) {
             ForgotPasswordScreen(
                 onBackClick = {
-                    navController.popBackStack() // Повернення на логін
+                    navController.popBackStack()
                 },
                 onSendLinkClick = { email ->
-                    // Тут буде логіка Firebase, поки просто лог
-                    println("Надіслати посилання на: $email")
+                    // Тимчасова заглушка для кнопки
+                    println("Відправлено на $email")
                 }
             )
+        }
+
+        composable(Routes.MAIN_APP) {
+            MainScreen()
         }
     }
 }
