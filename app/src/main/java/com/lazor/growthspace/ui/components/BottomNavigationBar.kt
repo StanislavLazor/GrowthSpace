@@ -10,6 +10,7 @@ import com.lazor.growthspace.ui.theme.PrimaryBlue
 import com.lazor.growthspace.ui.theme.SurfaceDark
 import com.lazor.growthspace.ui.theme.TextGray
 import androidx.compose.ui.unit.dp
+import com.lazor.growthspace.navigation.Routes
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -32,7 +33,8 @@ fun BottomNavigationBar(navController: NavController) {
             NavigationBarItem(
                 icon = { Icon(item.icon, contentDescription = item.title) },
                 label = { Text(text = item.title, style = MaterialTheme.typography.labelSmall) },
-                selected = currentRoute == item.route,
+                selected = currentRoute == item.route ||
+                        (item.route == Routes.HOME && currentRoute?.startsWith("coach_profile") == true),
                 onClick = {
                     navController.navigate(item.route) {
                         navController.graph.startDestinationRoute?.let { route ->

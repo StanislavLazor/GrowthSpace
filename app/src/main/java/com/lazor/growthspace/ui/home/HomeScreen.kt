@@ -1,5 +1,7 @@
 package com.lazor.growthspace.ui.home
 
+import com.lazor.growthspace.data.model.Coach
+import com.lazor.growthspace.data.model.dummyCoaches
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,31 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.ui.theme.*
 
-// Тимчасова модель даних для коуча
-data class Coach(
-    val id: Int,
-    val name: String,
-    val specialization: String,
-    val description: String,
-    val tag: String,
-    val rating: Double,
-    val price: Int,
-    val isRecommended: Boolean
-)
-
-// Тестові дані
-val dummyCoaches = listOf(
-    Coach(1, "Олександр Мельник", "Бізнес-стратегії", "Допомагаю масштабувати бізнес", "Бізнес", 4.9, 50, true),
-    Coach(2, "Олена Коваленко", "Life & Balance", "Гармонія між роботою та життям", "Life-coach", 4.8, 40, true),
-    Coach(3, "Ігор Ткачук", "Розвиток кар'єри", "Розвиток кар'єри, IT-сфера", "Кар'єра", 4.8, 45, false),
-    Coach(4, "Марія Савченко", "Психологія", "Подолання вигорання та стресу", "Психологія", 5.0, 60, false),
-    Coach(5, "Дмитро Бойко", "Запуск стартапів", "Запуск стартапів, лідерство", "Бізнес", 4.7, 80, false)
-)
-
 val categories = listOf("Усі", "Бізнес", "Life-coach", "Психологія", "Кар'єра")
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(navController: androidx.navigation.NavController) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(categories.first()) }
 
@@ -140,7 +121,11 @@ fun HomeScreen() {
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(recommended) { coach ->
-                    RecommendedCoachCard(coach)
+                    Box(modifier = Modifier.clickable {
+                        navController.navigate("coach_profile/${coach.id}")
+                    }) {
+                        RecommendedCoachCard(coach)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(32.dp))
@@ -159,7 +144,11 @@ fun HomeScreen() {
 
         // Вертикальний список всіх спеціалістів
         items(dummyCoaches) { coach ->
-            SpecialistCard(coach)
+            Box(modifier = Modifier.clickable {
+                navController.navigate("coach_profile/${coach.id}")
+            }) {
+                SpecialistCard(coach)
+            }
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
@@ -292,5 +281,7 @@ fun SpecialistCard(coach: Coach) {
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
-    HomeScreen()
+    // Створюємо фейковий навігатор спеціально для прев'ю
+    val fakeNavController = androidx.navigation.compose.rememberNavController()
+    HomeScreen(navController = fakeNavController)
 }
