@@ -13,6 +13,7 @@ import com.lazor.growthspace.navigation.Routes
 import com.lazor.growthspace.ui.components.BottomNavigationBar
 import com.lazor.growthspace.ui.home.HomeScreen
 import com.lazor.growthspace.ui.coach.CoachProfileScreen
+import com.lazor.growthspace.ui.coach.BookingDateScreen
 
 @Composable
 fun MainScreen() {
@@ -32,22 +33,37 @@ fun MainScreen() {
                 HomeScreen(navController = navController)
             }
 
-            // НОВИЙ БЛОК: Екран профілю коуча
             composable(
                 route = Routes.COACH_PROFILE,
                 arguments = listOf(navArgument("id") { type = NavType.IntType })
             ) { backStackEntry ->
-                // Витягуємо ID з маршруту
                 val coachId = backStackEntry.arguments?.getInt("id") ?: 1
 
                 CoachProfileScreen(
                     coachId = coachId,
                     onBackClick = {
-                        navController.popBackStack() // Повернення назад
+                        navController.popBackStack()
                     },
                     onBookSessionClick = {
-                        // Тимчасова заглушка для бронювання
-                        println("Бронювання сесії з коучем $coachId")
+                        navController.navigate("booking_date/$coachId")
+                    }
+                )
+            }
+
+            composable(
+                route = Routes.BOOKING_DATE,
+                arguments = listOf(navArgument("id") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val coachId = backStackEntry.arguments?.getInt("id") ?: 1
+
+                BookingDateScreen(
+                    coachId = coachId,
+                    onBackClick = {
+                        navController.popBackStack()
+                    },
+                    onNextClick = { selectedDate ->
+                        // Сюди ми додамо перехід на наступний екран (вибір часу), коли він буде готовий
+                        println("Вибрано дату: $selectedDate")
                     }
                 )
             }

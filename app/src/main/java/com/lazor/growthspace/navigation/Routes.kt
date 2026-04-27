@@ -8,4 +8,5 @@ object Routes{
     const val MAIN_APP = "main_app"
     const val HOME = "home"
     const val COACH_PROFILE = "coach_profile/{id}"
+    const val BOOKING_DATE = "booking_date/{id}"
 }
