@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.lazor.growthspace.navigation.NavigationItem
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.lazor.growthspace.ui.theme.PrimaryBlue
 import com.lazor.growthspace.ui.theme.SurfaceDark
 import com.lazor.growthspace.ui.theme.TextGray
@@ -37,11 +38,8 @@ fun BottomNavigationBar(navController: NavController) {
                         (item.route == Routes.HOME && currentRoute?.startsWith("coach_profile") == true),
                 onClick = {
                     navController.navigate(item.route) {
-                        navController.graph.startDestinationRoute?.let { route ->
-                            popUpTo(route) { saveState = true }
-                        }
+                        popUpTo(navController.graph.findStartDestination().id)
                         launchSingleTop = true
-                        restoreState = true
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
