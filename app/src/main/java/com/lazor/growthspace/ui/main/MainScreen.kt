@@ -14,10 +14,12 @@ import com.lazor.growthspace.ui.coach.BookingConfirmScreen
 import androidx.navigation.navArgument
 import com.lazor.growthspace.navigation.Routes
 import com.lazor.growthspace.ui.coach.BookingTimeScreen
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.lazor.growthspace.ui.coach.BookingDateScreen
 import com.lazor.growthspace.ui.coach.CoachProfileScreen
 import com.lazor.growthspace.ui.components.BottomNavigationBar
 import com.lazor.growthspace.ui.coach.BookingStatusScreen
+import com.lazor.growthspace.ui.session.SessionsScreen
 import com.lazor.growthspace.ui.home.HomeScreen
 
 @Composable
@@ -125,14 +127,13 @@ fun MainScreen() {
                     onBackClick = { navController.popBackStack() },
                     onSuccess = {
                         navController.navigate("booking_status/$coachId/$date/$time") {
-                            // Очищаємо весь шлях бронювання з історії
                             popUpTo(Routes.HOME)
                         }
                     }
                 )
             }
 
-            // 3. СТАТУС
+            // СТАТУС БРОНЮВАННЯ
             composable(
                 route = Routes.BOOKING_STATUS,
                 arguments = listOf(
@@ -145,21 +146,23 @@ fun MainScreen() {
                 val date = backStackEntry.arguments?.getString("date") ?: ""
                 val time = backStackEntry.arguments?.getString("time") ?: ""
 
-                        BookingStatusScreen(
-                            coachId = coachId,
-                            date = date,
-                            time = time,
-                            onGoToSessions = {
-                                // Перехід на вкладку "Сесії"
-                                navController.navigate("sessions") {
-                                    popUpTo(Routes.HOME)
-                                }
-                            }
-                        )
+                BookingStatusScreen(
+                    coachId = coachId,
+                    date = date,
+                    time = time,
+                    onGoToSessions = {
+                        navController.navigate("sessions") {
+                            popUpTo(Routes.HOME)
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
 
             // Порожні вкладки для нижнього меню
-            composable("sessions") { }
+            composable("sessions") {
+                SessionsScreen()
+            }
             composable("chat") { }
             composable("progress") { }
             composable("profile") { }
