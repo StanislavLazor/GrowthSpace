@@ -22,6 +22,7 @@ import com.lazor.growthspace.ui.coach.BookingStatusScreen
 import com.lazor.growthspace.ui.session.SessionsScreen
 import com.lazor.growthspace.ui.home.HomeScreen
 import com.lazor.growthspace.ui.progress.ProgressScreen
+import com.lazor.growthspace.ui.chat.ChatListScreen
 
 @Composable
 fun MainScreen() {
@@ -164,7 +165,37 @@ fun MainScreen() {
             composable("sessions") {
                 SessionsScreen()
             }
-            composable("chat") { }
+            composable("chat") {
+                ChatListScreen(
+                    onChatClick = { coachName ->
+                        val encodedName = android.net.Uri.encode(coachName)
+                        navController.navigate("chat_room/$encodedName")
+                    }
+                )
+            }
+
+            composable(
+                route = "chat_room/{coachName}",
+                arguments = listOf(navArgument("coachName") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val coachName = backStackEntry.arguments?.getString("coachName") ?: "Коуч"
+
+                // Визначаємо ID коуча на основі його імені
+                val coachId = when {
+                    coachName.contains("Олександр") -> 1
+                    coachName.contains("Олена") -> 2
+                    coachName.contains("Дмитро") -> 3
+                    else -> 1
+                }
+
+                com.lazor.growthspace.ui.chat.ChatScreen(
+                    coachName = coachName,
+                    onBackClick = { navController.popBackStack() },
+                    onProfileClick = {
+                        navController.navigate("coach_profile/$coachId")
+                    }
+                )
+            }
             composable("progress") {
                 ProgressScreen()
             }
