@@ -21,6 +21,7 @@ import com.lazor.growthspace.ui.components.BottomNavigationBar
 import com.lazor.growthspace.ui.coach.BookingStatusScreen
 import com.lazor.growthspace.ui.session.SessionsScreen
 import com.lazor.growthspace.ui.home.HomeScreen
+import com.lazor.growthspace.ui.progress.ProgressScreen
 
 @Composable
 fun MainScreen() {
@@ -164,7 +165,9 @@ fun MainScreen() {
                 SessionsScreen()
             }
             composable("chat") { }
-            composable("progress") { }
+            composable("progress") {
+                ProgressScreen()
+            }
             composable("profile") { }
         }
     }
