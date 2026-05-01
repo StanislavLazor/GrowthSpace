@@ -67,7 +67,14 @@ fun AppNavGraph() {
         }
 
         composable(Routes.MAIN_APP) {
-            MainScreen()
+            MainScreen(
+                onLogout = {
+                    // Використовуємо зовнішній navController для переходу на логін
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }
