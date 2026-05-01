@@ -23,6 +23,7 @@ import com.lazor.growthspace.ui.session.SessionsScreen
 import com.lazor.growthspace.ui.home.HomeScreen
 import com.lazor.growthspace.ui.progress.ProgressScreen
 import com.lazor.growthspace.ui.chat.ChatListScreen
+import com.lazor.growthspace.ui.profile.EditProfileScreen
 import com.lazor.growthspace.ui.profile.ProfileScreen
 
 @Composable
@@ -202,8 +203,18 @@ fun MainScreen(onLogout: () -> Unit) {
             }
             composable("profile") {
                 ProfileScreen(
-                    onLogoutClick = {
-                        onLogout() // Викликаємо колбек, який прийшов зверху
+                    onLogoutClick = { onLogout()},
+                    onEditAvatarClick = {
+                        navController.navigate("edit_profile")
+                    }
+                )
+            }
+            composable("edit_profile") {
+                EditProfileScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onSaveClick = {
+                        // Поки просто повертаємось назад
+                        navController.popBackStack()
                     }
                 )
             }
