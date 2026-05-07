@@ -27,7 +27,8 @@ import com.lazor.growthspace.ui.profile.EditProfileScreen
 import com.lazor.growthspace.ui.profile.ProfileScreen
 
 @Composable
-fun MainScreen(onLogout: () -> Unit) {
+fun MainScreen(onLogout: () -> Unit,
+               onNavigateToLegal: (String) -> Unit = {}) {
     val navController = rememberNavController()
 
     // СЛУХАЄМО ПОТОЧНИЙ МАРШРУТ
@@ -206,7 +207,8 @@ fun MainScreen(onLogout: () -> Unit) {
                     onLogoutClick = { onLogout()},
                     onEditAvatarClick = {
                         navController.navigate("edit_profile")
-                    }
+                    },
+                    onLegalClick = { type -> onNavigateToLegal(type) }
                 )
             }
             composable("edit_profile") {

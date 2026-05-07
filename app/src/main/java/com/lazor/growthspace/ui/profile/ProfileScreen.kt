@@ -5,8 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
@@ -28,7 +30,8 @@ import com.lazor.growthspace.ui.theme.*
 @Composable
 fun ProfileScreen(
     onLogoutClick: () -> Unit,
-    onEditAvatarClick: () -> Unit = {}
+    onEditAvatarClick: () -> Unit = {},
+    onLegalClick: (String) -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -44,7 +47,8 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()), // ДОДАНО СКРОЛ
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(24.dp))
@@ -113,14 +117,25 @@ fun ProfileScreen(
             ) {
                 SettingsItem(icon = Icons.Outlined.Person, title = "Персональні дані")
                 SettingsDivider()
-                SettingsItem(icon = Icons.Outlined.Shield, title = "Безпека")
+
+                // Юридичні пункти
+                SettingsItem(
+                    icon = Icons.Outlined.Description,
+                    title = "Умови користування",
+                    onClick = { onLegalClick("terms") }
+                )
                 SettingsDivider()
+                SettingsItem(
+                    icon = Icons.Outlined.Policy,
+                    title = "Політика компанії",
+                    onClick = { onLegalClick("policy") }
+                )
+                SettingsDivider()
+
                 SettingsItem(icon = Icons.Outlined.Notifications, title = "Сповіщення")
-                SettingsDivider()
-                SettingsItem(icon = Icons.Outlined.Language, title = "Мова", value = "Українська")
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(40.dp))
 
             // Кнопка виходу
             OutlinedButton(
@@ -144,13 +159,17 @@ fun ProfileScreen(
     }
 }
 
-
 @Composable
-fun SettingsItem(icon: ImageVector, title: String, value: String? = null) {
+fun SettingsItem(
+    icon: ImageVector,
+    title: String,
+    value: String? = null,
+    onClick: () -> Unit = {}
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* TODO */ }
+            .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -163,6 +182,7 @@ fun SettingsItem(icon: ImageVector, title: String, value: String? = null) {
             Icon(icon, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
         }
         Spacer(modifier = Modifier.width(16.dp))
+
         Text(title, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
 
         if (value != null) {
