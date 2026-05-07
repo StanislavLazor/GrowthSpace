@@ -44,11 +44,13 @@ fun AppNavGraph() {
                         popUpTo(0) { inclusive = true }
                     }
                 },
-
                 onLoginClick = {
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.REGISTER) { inclusive = true }
                     }
+                },
+                onNavigateToLegal = { type ->
+                    navController.navigate("legal/$type")
                 }
             )
         }
@@ -66,14 +68,31 @@ fun AppNavGraph() {
             )
         }
 
+        // Головний екран додатку
         composable(Routes.MAIN_APP) {
             MainScreen(
                 onLogout = {
-                    // Використовуємо зовнішній navController для переходу на логін
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(0) { inclusive = true }
                     }
+                },
+                onNavigateToLegal = { type ->
+                    navController.navigate("legal/$type")
                 }
+            )
+        }
+
+        // Екран для юридичних текстів (Умови та Політика)
+        composable("legal/{type}") { backStackEntry ->
+            val type = backStackEntry.arguments?.getString("type") ?: "terms"
+
+            val title = if (type == "terms") "Умови користування" else "Політика компанії"
+            val text = if (type == "terms") com.lazor.growthspace.ui.LegalData.termsText else com.lazor.growthspace.ui.LegalData.policyText
+
+            com.lazor.growthspace.ui.legal.LegalScreen(
+                title = title,
+                content = text,
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

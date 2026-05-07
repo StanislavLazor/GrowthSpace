@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -42,7 +43,8 @@ import com.lazor.growthspace.ui.theme.*
 @Composable
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    onNavigateToLegal: (String) -> Unit // НОВИЙ ПАРАМЕТР ДЛЯ НАВІГАЦІЇ
 ) {
     // Базові стейти
     var name by remember { mutableStateOf("") }
@@ -228,20 +230,49 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Чекбокс
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        // ОНОВЛЕНИЙ ЧЕКБОКС З КЛІКАБЕЛЬНИМ ТЕКСТОМ
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+        ) {
             Checkbox(
                 checked = isTermsAccepted,
                 onCheckedChange = { isTermsAccepted = it },
                 colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue, uncheckedColor = TextGray, checkmarkColor = TextWhite)
             )
-            val annotatedText = buildAnnotatedString {
-                append("Я погоджуюсь з ")
-                withStyle(style = SpanStyle(color = PrimaryBlue)) { append("Умовами користування") }
-                append(" та ")
-                withStyle(style = SpanStyle(color = PrimaryBlue)) { append("Політикою компанії") }
+
+            val annotatedString = buildAnnotatedString {
+                withStyle(style = SpanStyle(color = TextGray, fontSize = 13.sp)) {
+                    append("Я погоджуюсь з ")
+                }
+                pushStringAnnotation(tag = "terms", annotation = "terms")
+                withStyle(style = SpanStyle(color = PrimaryBlue, fontSize = 13.sp)) {
+                    append("Умовами користування")
+                }
+                pop()
+                withStyle(style = SpanStyle(color = TextGray, fontSize = 13.sp)) {
+                    append(" та\n")
+                }
+                pushStringAnnotation(tag = "policy", annotation = "policy")
+                withStyle(style = SpanStyle(color = PrimaryBlue, fontSize = 13.sp)) {
+                    append("Політикою компанії")
+                }
+                pop()
             }
-            Text(text = annotatedText, fontSize = 12.sp, color = TextGray)
+
+            ClickableText(
+                text = annotatedString,
+                onClick = { offset ->
+                    annotatedString.getStringAnnotations(tag = "terms", start = offset, end = offset)
+                        .firstOrNull()?.let {
+                            onNavigateToLegal("terms")
+                        }
+                    annotatedString.getStringAnnotations(tag = "policy", start = offset, end = offset)
+                        .firstOrNull()?.let {
+                            onNavigateToLegal("policy")
+                        }
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -272,5 +303,5 @@ fun RegisterScreen(
 @Preview(showBackground = true)
 @Composable
 fun RegisterScreenPreview() {
-    RegisterScreen(onRegisterSuccess = {}, onLoginClick = {})
+    RegisterScreen(onRegisterSuccess = {}, onLoginClick = {}, onNavigateToLegal = {})
 }
