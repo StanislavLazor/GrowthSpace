@@ -22,17 +22,70 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.ui.theme.*
 
+// Моделі даних для наших цілей та завдань
 data class TaskItem(val id: Int, val title: String, val initialCompleted: Boolean)
+
+data class GoalData(
+    val title: String,
+    val coach: String,
+    val color: Color,
+    val tasks: SnapshotStateList<TaskItem>
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressScreen() {
     var selectedTab by remember { mutableIntStateOf(0) }
+
+    // 1. СТВОРЮЄМО СПИСКИ ЗАВДАНЬ
+    val leadershipTasks = remember {
+        mutableStateListOf(
+            TaskItem(1, "Прочитати книгу з менеджменту", true),
+            TaskItem(2, "Провести 1-on-1 з командою", false),
+            TaskItem(3, "Підготувати презентацію стратегії", false)
+        )
+    }
+    val speakingTasks = remember {
+        mutableStateListOf(
+            TaskItem(4, "Записати відео-пітч", true),
+            TaskItem(5, "Виступити на мітапі", false)
+        )
+    }
+    val timeTasks = remember {
+        mutableStateListOf(
+            TaskItem(6, "Впровадити Pomodoro", true),
+            TaskItem(7, "Планування тижня", true)
+        )
+    }
+
+    // 2. ОБ'ЄДНУЄМО ЇХ В ЄДИНУ БАЗУ ЦІЛЕЙ
+    val allGoals = remember {
+        listOf(
+            GoalData("Лідерські навички", "Олександр Мельник", PrimaryBlue, leadershipTasks),
+            GoalData("Публічні виступи", "Марія Коваленко", Color(0xFFFFA000), speakingTasks),
+            GoalData("Тайм-менеджмент", "Дмитро Ткаченко", Color(0xFF00E676), timeTasks)
+        )
+    }
+
+    // 3. ДИНАМІЧНЕ СОРТУВАННЯ (Магія тут!)
+    // Активна ціль — це та, де є хоча б ОДНЕ невиконане завдання
+    val activeGoals = allGoals.filter { goal -> goal.tasks.any { !it.initialCompleted } }
+    // Завершена ціль — це та, де ВСІ завдання виконані
+    val completedGoals = allGoals.filter { goal -> goal.tasks.all { it.initialCompleted } }
+
+    // 4. ДИНАМІЧНА СТАТИСТИКА
+    val totalTasksCount = allGoals.sumOf { it.tasks.size }
+    val completedTasksCount = allGoals.sumOf { goal -> goal.tasks.count { it.initialCompleted } }
+    val activeTasksCount = totalTasksCount - completedTasksCount
+
+    val globalProgress = if (totalTasksCount > 0) completedTasksCount.toFloat() / totalTasksCount else 0f
+    val globalProgressPercent = (globalProgress * 100).toInt()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -64,68 +117,47 @@ fun ProgressScreen() {
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // 1. Плавний перемикач
+            // Плавний перемикач
             item {
                 ProgressTabSwitch(selectedTab = selectedTab) { selectedTab = it }
             }
 
-            // 2. Великий круговий прогрес
+            // Великий круговий прогрес (ВЖЕ ДИНАМІЧНИЙ)
             item {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    GlowingCircularProgress(progress = 0.74f, text = "74%")
+                    GlowingCircularProgress(progress = globalProgress, text = "$globalProgressPercent%")
                 }
             }
 
-            // 3. Плашка зі статистикою
+            // Плашка зі статистикою (ВЖЕ СИНХРОНІЗОВАНА З АКТИВНИМИ ЦІЛЯМИ)
             item {
-                StatsRow()
+                StatsRow(goals = activeGoals.size, tasks = activeTasksCount)
             }
 
-            // 4. Списки карток
+            // Списки карток
             item {
                 Crossfade(targetState = selectedTab, label = "ProgressTab") { tab ->
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        if (tab == 0) {
-                            val leadershipTasks = remember {
-                                mutableStateListOf(
-                                    TaskItem(1, "Прочитати книгу з менеджменту", true),
-                                    TaskItem(2, "Провести 1-on-1 з командою", false),
-                                    TaskItem(3, "Підготувати презентацію стратегії", false)
-                                )
-                            }
-                            val speakingTasks = remember {
-                                mutableStateListOf(
-                                    TaskItem(4, "Записати відео-пітч", true),
-                                    TaskItem(5, "Виступити на мітапі", false)
-                                )
-                            }
+                        val goalsToShow = if (tab == 0) activeGoals else completedGoals
 
-                            InteractiveGoalCard(
-                                title = "Лідерські навички",
-                                coach = "Олександр Мельник",
-                                color = PrimaryBlue,
-                                tasks = leadershipTasks
-                            )
-                            InteractiveGoalCard(
-                                title = "Публічні виступи",
-                                coach = "Марія Коваленко",
-                                color = Color(0xFFFFA000),
-                                tasks = speakingTasks
+                        if (goalsToShow.isEmpty()) {
+                            // Якщо список порожній (наприклад, всі цілі виконано)
+                            Text(
+                                text = if (tab == 0) "Усі цілі завершено! 🎉" else "Ще немає завершених цілей",
+                                color = TextGray,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 16.sp
                             )
                         } else {
-                            // ЗАВЕРШЕНІ
-                            val timeTasks = remember {
-                                mutableStateListOf(
-                                    TaskItem(6, "Впровадити Pomodoro", true),
-                                    TaskItem(7, "Планування тижня", true)
+                            goalsToShow.forEach { goal ->
+                                InteractiveGoalCard(
+                                    title = goal.title,
+                                    coach = goal.coach,
+                                    color = goal.color,
+                                    tasks = goal.tasks
                                 )
                             }
-                            InteractiveGoalCard(
-                                title = "Тайм-менеджмент",
-                                coach = "Дмитро Ткаченко",
-                                color = Color(0xFF00E676),
-                                tasks = timeTasks
-                            )
                         }
                     }
                 }
@@ -135,10 +167,6 @@ fun ProgressScreen() {
         }
     }
 }
-
-// ==========================================
-// КОМПОНЕНТИ З ФІКСАМИ
-// ==========================================
 
 @Composable
 fun ProgressTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
@@ -169,41 +197,36 @@ fun GlowingCircularProgress(progress: Float, text: String) {
     val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1500), label = "circ_progress")
 
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(180.dp).padding(16.dp)) {
-        // Ефект світіння
         Box(
             modifier = Modifier
                 .size(170.dp)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            PrimaryBlue.copy(alpha = 0.4f),
-                            Color.Transparent
-                        )
-                    )
-                )
+                .background(brush = Brush.radialGradient(colors = listOf(PrimaryBlue.copy(alpha = 0.4f), Color.Transparent)))
         )
 
-        // Фонове коло
         CircularProgressIndicator(progress = { 1f }, modifier = Modifier.size(140.dp), color = SurfaceDarkElevated, strokeWidth = 10.dp, strokeCap = StrokeCap.Round)
-        // Активний прогрес
         CircularProgressIndicator(progress = { animatedProgress }, modifier = Modifier.size(140.dp), color = PrimaryBlue, strokeWidth = 10.dp, strokeCap = StrokeCap.Round)
 
-        // Текст у центрі
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text, color = TextWhite, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-            Text("Загальний прогрес", color = TextGray, fontSize = 12.sp)
+            Text(
+                text = "Загальний\nпрогрес", // <-- ВИПРАВЛЕНО ТУТ: Розбито на 2 рядки
+                color = TextGray,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center, // <-- Текст тепер ідеально по центру
+                lineHeight = 16.sp
+            )
         }
     }
 }
 
 @Composable
-fun StatsRow() {
+fun StatsRow(goals: Int, tasks: Int) {
     Row(
         modifier = Modifier.fillMaxWidth().background(SurfaceDarkElevated, RoundedCornerShape(24.dp)).padding(vertical = 20.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        StatItem(icon = Icons.Outlined.CheckCircle, iconColor = PrimaryBlue, value = "12", label = "Цілей")
-        StatItem(icon = Icons.Default.FlashOn, iconColor = Color(0xFFFFA000), value = "45", label = "Завдань")
+        StatItem(icon = Icons.Outlined.CheckCircle, iconColor = PrimaryBlue, value = goals.toString(), label = "Цілей")
+        StatItem(icon = Icons.Default.FlashOn, iconColor = Color(0xFFFFA000), value = tasks.toString(), label = "Завдань")
         StatItem(icon = Icons.Default.AccessTime, iconColor = Color(0xFF00E676), value = "32h", label = "Часу")
     }
 }
@@ -235,30 +258,22 @@ fun InteractiveGoalCard(title: String, coach: String, color: Color, tasks: Snaps
                 Text(title, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text("Коуч: $coach", color = TextGray, fontSize = 13.sp)
             }
-            // Динамічний текст відсотків
-            Text("${(progress * 100).toInt()}%", color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            // <-- Відсоток тепер береться з анімованого прогресу!
+            Text("${(animatedProgress * 100).toInt()}%", color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Лінійний прогрес бар
         Box(modifier = Modifier.fillMaxWidth().height(6.dp), contentAlignment = Alignment.CenterStart) {
             Box(modifier = Modifier.fillMaxSize().background(BackgroundDark, CircleShape))
             if (progress > 0f) {
-                // М'яке неонове світіння під лінією
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(animatedProgress)
                         .padding(horizontal = 2.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                listOf(color.copy(alpha = 0.6f), Color.Transparent)
-                            ),
-                            CircleShape
-                        )
+                        .background(brush = Brush.verticalGradient(listOf(color.copy(alpha = 0.6f), Color.Transparent)), CircleShape)
                 )
-                // Сама активна лінія
                 Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress).background(color, CircleShape))
             }
         }
@@ -273,6 +288,7 @@ fun InteractiveGoalCard(title: String, coach: String, color: Color, tasks: Snaps
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable {
+                            // <-- ЗМІНА СТАНУ ЗАВДАННЯ (оновлює ВЕСЬ екран)
                             tasks[index] = task.copy(initialCompleted = !task.initialCompleted)
                         }
                         .padding(vertical = 4.dp)
@@ -290,7 +306,6 @@ fun InteractiveGoalCard(title: String, coach: String, color: Color, tasks: Snaps
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         textDecoration = if (task.initialCompleted) TextDecoration.LineThrough else TextDecoration.None
-
                     )
                 }
             }

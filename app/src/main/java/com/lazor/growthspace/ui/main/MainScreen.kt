@@ -23,9 +23,12 @@ import com.lazor.growthspace.ui.session.SessionsScreen
 import com.lazor.growthspace.ui.home.HomeScreen
 import com.lazor.growthspace.ui.progress.ProgressScreen
 import com.lazor.growthspace.ui.chat.ChatListScreen
+import com.lazor.growthspace.ui.profile.EditProfileScreen
+import com.lazor.growthspace.ui.profile.ProfileScreen
 
 @Composable
-fun MainScreen() {
+fun MainScreen(onLogout: () -> Unit,
+               onNavigateToLegal: (String) -> Unit = {}) {
     val navController = rememberNavController()
 
     // СЛУХАЄМО ПОТОЧНИЙ МАРШРУТ
@@ -199,7 +202,24 @@ fun MainScreen() {
             composable("progress") {
                 ProgressScreen()
             }
-            composable("profile") { }
+            composable("profile") {
+                ProfileScreen(
+                    onLogoutClick = { onLogout()},
+                    onEditAvatarClick = {
+                        navController.navigate("edit_profile")
+                    },
+                    onLegalClick = { type -> onNavigateToLegal(type) }
+                )
+            }
+            composable("edit_profile") {
+                EditProfileScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onSaveClick = {
+                        // Поки просто повертаємось назад
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
     }
 }
