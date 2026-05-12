@@ -1,17 +1,15 @@
 package com.lazor.growthspace.ui.profile
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.lazor.growthspace.data.model.User
 import com.lazor.growthspace.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
-
+// Стан залишаємо без змін
 sealed class ProfileState {
     object Loading : ProfileState()
     data class Success(val user: User) : ProfileState()
@@ -26,37 +24,50 @@ class ProfileViewModel(
     private val _profileState = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val profileState: StateFlow<ProfileState> = _profileState.asStateFlow()
 
+    // Змінна для збереження нашого "слухача"
+    private var listenerRegistration: ListenerRegistration? = null
+
     init {
-        loadUserProfile()
+        startListeningToProfile()
     }
 
-    private fun loadUserProfile() {
-        viewModelScope.launch {
+    private fun startListeningToProfile() {
+        val userId = authRepository.getCurrentUserId()
+        if (userId != null) {
             _profileState.value = ProfileState.Loading
-            try {
-                val userId = authRepository.getCurrentUserId()
-                if (userId != null) {
-                    // Тягнемо дані юзера з Firestore
-                    val document = firestore.collection("users").document(userId).get().await()
 
-                    val user = document.toObject(User::class.java) ?: User(
-                        id = userId,
-                        name = document.getString("name") ?: "Користувач",
-                        email = document.getString("email") ?: "",
-                        role = document.getString("role") ?: "client"
-                    )
+            // Замість одноразового get() використовуємо SnapshotListener
+            listenerRegistration = firestore.collection("users").document(userId)
+                .addSnapshotListener { document, error ->
+                    if (error != null) {
+                        _profileState.value = ProfileState.Error(error.message ?: "Помилка")
+                        return@addSnapshotListener
+                    }
 
-                    _profileState.value = ProfileState.Success(user)
-                } else {
-                    _profileState.value = ProfileState.Error("Користувача не знайдено")
+                    if (document != null && document.exists()) {
+                        val user = document.toObject(User::class.java) ?: User(
+                            id = userId,
+                            name = document.getString("name") ?: "Користувач",
+                            email = document.getString("email") ?: "",
+                            role = document.getString("role") ?: "client",
+                            bio = document.getString("bio") ?: ""
+                        )
+                        _profileState.value = ProfileState.Success(user)
+                    } else {
+                        _profileState.value = ProfileState.Error("Користувача не знайдено")
+                    }
                 }
-            } catch (e: Exception) {
-                _profileState.value = ProfileState.Error(e.message ?: "Помилка завантаження")
-            }
+        } else {
+            _profileState.value = ProfileState.Error("Користувача не знайдено")
         }
     }
 
     fun logout() {
         authRepository.logout()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        listenerRegistration?.remove()
     }
 }

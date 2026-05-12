@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.lazor.growthspace.data.repository.AuthRepository
 import com.lazor.growthspace.data.repository.AuthRepositoryImpl
 import com.lazor.growthspace.ui.auth.AuthViewModel
+import com.lazor.growthspace.ui.profile.EditProfileViewModel
 import com.lazor.growthspace.ui.profile.ProfileViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -21,4 +22,5 @@ val appModule = module {
     // 3. ViewModels
     viewModel { AuthViewModel(get()) }
     viewModel { ProfileViewModel(get(), get()) }
+    viewModel { EditProfileViewModel(get(), get()) }
 }
