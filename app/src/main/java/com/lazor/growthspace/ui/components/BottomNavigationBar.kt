@@ -38,8 +38,14 @@ fun BottomNavigationBar(navController: NavController) {
                         (item.route == Routes.HOME && currentRoute?.startsWith("coach_profile") == true),
                 onClick = {
                     navController.navigate(item.route) {
-                        popUpTo(navController.graph.findStartDestination().id)
+                        // Очищаємо стек до головного екрана, але ЗБЕРІГАЄМО стан
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        // Уникаємо створення копій одного й того ж екрана
                         launchSingleTop = true
+                        // ВІДНОВЛЮЄМО стан (наприклад, позицію скролу), якщо ми сюди повертаємось
+                        restoreState = true
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
