@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "576112425254",
+    "project_id": "growthspace-c260392e",
+    "storage_bucket": "growthspace-c260392e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:576112425254:android:26d7d418aa78bac1b069e7",
+        "android_client_info": {
+          "package_name": "com.lazor.growthspace"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBzF49pamu-kDzOsbES29wAT5PBPDh8Kg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

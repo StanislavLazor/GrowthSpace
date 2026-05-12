@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    // Add the Google services Gradle plugin
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -59,4 +61,11 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    // Firebase BoM (керує версіями всіх бібліотек Firebase)
+    implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
+    // Модулі Firebase (версії підтягнуться автоматично з BoM)
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    // Koin для Compose
+    implementation("io.insert-koin:koin-androidx-compose:3.5.3")
 }
