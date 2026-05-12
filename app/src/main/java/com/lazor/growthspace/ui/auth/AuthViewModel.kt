@@ -40,6 +40,22 @@ class AuthViewModel(
         }
     }
 
+    // Функція входу (логіну)
+    fun login(email: String, password: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading // Показуємо завантаження
+
+            // Викликаємо функцію з репозиторію
+            val result = authRepository.login(email, password)
+
+            result.onSuccess {
+                _authState.value = AuthState.Success
+            }.onFailure { error ->
+                _authState.value = AuthState.Error(error.message ?: "Невірний email або пароль")
+            }
+        }
+    }
+
     // Скидання стану (щоб повідомлення про помилку не висіло вічно)
     fun resetState() {
         _authState.value = AuthState.Idle

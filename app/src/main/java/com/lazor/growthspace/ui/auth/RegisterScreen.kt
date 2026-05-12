@@ -1,6 +1,7 @@
 package com.lazor.growthspace.ui.auth
 
 import android.annotation.SuppressLint
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -32,19 +34,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.lazor.growthspace.navigation.Routes
 import com.lazor.growthspace.ui.components.CustomTextField
 import com.lazor.growthspace.ui.components.PrimaryButton
 import com.lazor.growthspace.ui.theme.*
+import org.koin.androidx.compose.koinViewModel
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
-    onLoginClick: () -> Unit,
-    onNavigateToLegal: (String) -> Unit // НОВИЙ ПАРАМЕТР ДЛЯ НАВІГАЦІЇ
+    navController: NavController,
+    viewModel: AuthViewModel = koinViewModel() // Підключаємо логіку
 ) {
     // Базові стейти
     var name by remember { mutableStateOf("") }
@@ -61,247 +64,286 @@ fun RegisterScreen(
     var isClientRole by remember { mutableStateOf(true) }
     var isTermsAccepted by remember { mutableStateOf(false) }
 
+    val authState by viewModel.authState.collectAsState()
+    val context = LocalContext.current
+
     // Логіка валідації
     val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
     val isEmailError = email.isNotEmpty() && !email.matches(emailRegex)
     val isPasswordError = password.isNotEmpty() && password.length < 8
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
-            .padding(horizontal = 24.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Spacer(modifier = Modifier.height(64.dp))
-
-        // Заголовки
-        Text(
-            text = "Створити\nакаунт",
-            color = TextWhite,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 36.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Приєднуйтесь до GrowthSpace та почніть свій шлях розвитку.",
-            color = TextGray,
-            fontSize = 14.sp
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Перемикач ролей
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .background(SurfaceDarkElevated, shape = RoundedCornerShape(12.dp))
-                .padding(4.dp)
-        ) {
-            val tabWidth = maxWidth / 2
-
-            val indicatorOffset by animateDpAsState(
-                targetValue = if (isClientRole) 0.dp else tabWidth,
-                animationSpec = tween(durationMillis = 300),
-                label = "indicatorOffset"
-            )
-
-            Box(
-                modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(tabWidth)
-                    .fillMaxHeight()
-                    .background(SurfaceDark, shape = RoundedCornerShape(10.dp))
-                    .border(1.dp, PrimaryBlue.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-            )
-
-            Row(modifier = Modifier.fillMaxSize()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { isClientRole = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Клієнт",
-                        color = if (isClientRole) PrimaryBlue else TextGray,
-                        fontWeight = if (isClientRole) FontWeight.Bold else FontWeight.Normal
-                    )
+    // ОБРОБКА РЕЗУЛЬТАТІВ РЕЄСТРАЦІЇ
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthState.Success -> {
+                navController.navigate(Routes.MAIN_APP) {
+                    popUpTo(0) { inclusive = true }
                 }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { isClientRole = false },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Коуч",
-                        color = if (!isClientRole) PrimaryBlue else TextGray,
-                        fontWeight = if (!isClientRole) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
+                viewModel.resetState()
             }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Базові поля вводу (Ім'я та Прізвище)
-        CustomTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = "Ім'я",
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, keyboardType = KeyboardType.Text)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        CustomTextField(
-            value = surname,
-            onValueChange = { surname = it },
-            label = "Прізвище",
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, keyboardType = KeyboardType.Text)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Анімавона поля лише для коуча
-        AnimatedVisibility(
-            visible = !isClientRole,
-            enter = expandVertically(animationSpec = tween(300)),
-            exit = shrinkVertically(animationSpec = tween(300))
-        ) {
-            Column {
-                CustomTextField(
-                    value = specialization,
-                    onValueChange = { specialization = it },
-                    label = "Спеціалізація (напр., Бізнес-коуч)",
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, keyboardType = KeyboardType.Text)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                CustomTextField(
-                    value = experience,
-                    onValueChange = { experience = it },
-                    label = "Досвід роботи (років)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number) // Тільки цифри
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+            is AuthState.Error -> {
+                Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_LONG).show()
+                viewModel.resetState()
             }
-        }
-
-        // Поле Email
-        CustomTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = "Email",
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            isError = isEmailError
-        )
-        if (isEmailError) {
-            Text(text = "Невірний формат Email", color = StatusCanceled, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
-        } else {
-            Text(text = "Ми надішлемо вам лист для підтвердження", color = TextGray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Поле Пароля
-        CustomTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = "Пароль",
-            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            isError = isPasswordError,
-            trailingIcon = {
-                val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                    Icon(imageVector = image, contentDescription = "Показати пароль", tint = TextGray)
-                }
-            }
-        )
-        if (isPasswordError) {
-            Text(text = "Пароль має містити мінімум 8 символів", color = StatusCanceled, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ОНОВЛЕНИЙ ЧЕКБОКС З КЛІКАБЕЛЬНИМ ТЕКСТОМ
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-        ) {
-            Checkbox(
-                checked = isTermsAccepted,
-                onCheckedChange = { isTermsAccepted = it },
-                colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue, uncheckedColor = TextGray, checkmarkColor = TextWhite)
-            )
-
-            val annotatedString = buildAnnotatedString {
-                withStyle(style = SpanStyle(color = TextGray, fontSize = 13.sp)) {
-                    append("Я погоджуюсь з ")
-                }
-                pushStringAnnotation(tag = "terms", annotation = "terms")
-                withStyle(style = SpanStyle(color = PrimaryBlue, fontSize = 13.sp)) {
-                    append("Умовами користування")
-                }
-                pop()
-                withStyle(style = SpanStyle(color = TextGray, fontSize = 13.sp)) {
-                    append(" та\n")
-                }
-                pushStringAnnotation(tag = "policy", annotation = "policy")
-                withStyle(style = SpanStyle(color = PrimaryBlue, fontSize = 13.sp)) {
-                    append("Політикою компанії")
-                }
-                pop()
-            }
-
-            ClickableText(
-                text = annotatedString,
-                onClick = { offset ->
-                    annotatedString.getStringAnnotations(tag = "terms", start = offset, end = offset)
-                        .firstOrNull()?.let {
-                            onNavigateToLegal("terms")
-                        }
-                    annotatedString.getStringAnnotations(tag = "policy", start = offset, end = offset)
-                        .firstOrNull()?.let {
-                            onNavigateToLegal("policy")
-                        }
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        val isBaseValid = name.isNotBlank() && surname.isNotBlank() && email.isNotBlank() && !isEmailError && password.isNotBlank() && !isPasswordError && isTermsAccepted
-        // Якщо коуч — + ще два поля, якщо клієнт — коучевські поля ігноруються (вважаються true)
-        val isCoachValid = if (!isClientRole) specialization.isNotBlank() && experience.isNotBlank() else true
-
-        val isFormValid = isBaseValid && isCoachValid
-
-        PrimaryButton(
-            text = "Зареєструватися",
-            isEnabled = isFormValid,
-            onClick = onRegisterSuccess
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Row(modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 32.dp, top = 24.dp), horizontalArrangement = Arrangement.Center) {
-            Text(text = "Вже маєте акаунт? ", color = TextGray)
-            Text(text = "Увійти", color = PrimaryBlue, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onLoginClick() })
+            else -> {}
         }
     }
-}
 
-@Preview(showBackground = true)
-@Composable
-fun RegisterScreenPreview() {
-    RegisterScreen(onRegisterSuccess = {}, onLoginClick = {}, onNavigateToLegal = {})
+    // Головний Box для накладання крутилки завантаження
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        // ТВІЙ ОРИГІНАЛЬНИЙ UI
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(modifier = Modifier.height(64.dp))
+
+            // Заголовки
+            Text(
+                text = "Створити\nакаунт",
+                color = TextWhite,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 36.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Приєднуйтесь до GrowthSpace та почніть свій шлях розвитку.",
+                color = TextGray,
+                fontSize = 14.sp
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Перемикач ролей
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .background(SurfaceDarkElevated, shape = RoundedCornerShape(12.dp))
+                    .padding(4.dp)
+            ) {
+                val tabWidth = maxWidth / 2
+
+                val indicatorOffset by animateDpAsState(
+                    targetValue = if (isClientRole) 0.dp else tabWidth,
+                    animationSpec = tween(durationMillis = 300),
+                    label = "indicatorOffset"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = indicatorOffset)
+                        .width(tabWidth)
+                        .fillMaxHeight()
+                        .background(SurfaceDark, shape = RoundedCornerShape(10.dp))
+                        .border(1.dp, PrimaryBlue.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                )
+
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { isClientRole = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Клієнт",
+                            color = if (isClientRole) PrimaryBlue else TextGray,
+                            fontWeight = if (isClientRole) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { isClientRole = false },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Коуч",
+                            color = if (!isClientRole) PrimaryBlue else TextGray,
+                            fontWeight = if (!isClientRole) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Базові поля вводу (Ім'я та Прізвище)
+            CustomTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = "Ім'я",
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, keyboardType = KeyboardType.Text)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            CustomTextField(
+                value = surname,
+                onValueChange = { surname = it },
+                label = "Прізвище",
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, keyboardType = KeyboardType.Text)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Анімовані поля лише для коуча
+            AnimatedVisibility(
+                visible = !isClientRole,
+                enter = expandVertically(animationSpec = tween(300)),
+                exit = shrinkVertically(animationSpec = tween(300))
+            ) {
+                Column {
+                    CustomTextField(
+                        value = specialization,
+                        onValueChange = { specialization = it },
+                        label = "Спеціалізація (напр., Бізнес-коуч)",
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, keyboardType = KeyboardType.Text)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    CustomTextField(
+                        value = experience,
+                        onValueChange = { experience = it },
+                        label = "Досвід роботи (років)",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+
+            // Поле Email
+            CustomTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = "Email",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                isError = isEmailError
+            )
+            if (isEmailError) {
+                Text(text = "Невірний формат Email", color = StatusCanceled, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
+            } else {
+                Text(text = "Ми надішлемо вам лист для підтвердження", color = TextGray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Поле Пароля
+            CustomTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = "Пароль",
+                isPassword = true, // Оце єдиний параметр, який тепер потрібен для пароля!
+                isError = isPasswordError
+            )
+            if (isPasswordError) {
+                Text(text = "Пароль має містити мінімум 8 символів", color = StatusCanceled, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ЧЕКБОКС З КЛІКАБЕЛЬНИМ ТЕКСТОМ
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                Checkbox(
+                    checked = isTermsAccepted,
+                    onCheckedChange = { isTermsAccepted = it },
+                    colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue, uncheckedColor = TextGray, checkmarkColor = TextWhite)
+                )
+
+                val annotatedString = buildAnnotatedString {
+                    withStyle(style = SpanStyle(color = TextGray, fontSize = 13.sp)) {
+                        append("Я погоджуюсь з ")
+                    }
+                    pushStringAnnotation(tag = "terms", annotation = "terms")
+                    withStyle(style = SpanStyle(color = PrimaryBlue, fontSize = 13.sp)) {
+                        append("Умовами користування")
+                    }
+                    pop()
+                    withStyle(style = SpanStyle(color = TextGray, fontSize = 13.sp)) {
+                        append(" та\n")
+                    }
+                    pushStringAnnotation(tag = "policy", annotation = "policy")
+                    withStyle(style = SpanStyle(color = PrimaryBlue, fontSize = 13.sp)) {
+                        append("Політикою компанії")
+                    }
+                    pop()
+                }
+
+                ClickableText(
+                    text = annotatedString,
+                    onClick = { offset ->
+                        annotatedString.getStringAnnotations(tag = "terms", start = offset, end = offset)
+                            .firstOrNull()?.let {
+                                navController.navigate("legal/terms")
+                            }
+                        annotatedString.getStringAnnotations(tag = "policy", start = offset, end = offset)
+                            .firstOrNull()?.let {
+                                navController.navigate("legal/policy")
+                            }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            val isBaseValid = name.isNotBlank() && surname.isNotBlank() && email.isNotBlank() && !isEmailError && password.isNotBlank() && !isPasswordError && isTermsAccepted
+            val isCoachValid = if (!isClientRole) specialization.isNotBlank() && experience.isNotBlank() else true
+            val isFormValid = isBaseValid && isCoachValid
+
+            PrimaryButton(
+                text = "Зареєструватися",
+                isEnabled = isFormValid,
+                onClick = {
+                    // З'єднуємо ім'я та прізвище для бази даних
+                    val fullName = "${name.trim()} ${surname.trim()}"
+                    // Передаємо дані у ViewModel
+                    viewModel.register(
+                        email = email.trim(),
+                        password = password,
+                        name = fullName,
+                        isCoach = !isClientRole
+                    )
+                }
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Row(modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp, top = 24.dp), horizontalArrangement = Arrangement.Center) {
+                Text(text = "Вже маєте акаунт? ", color = TextGray)
+                Text(
+                    text = "Увійти",
+                    color = PrimaryBlue,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { navController.navigate(Routes.LOGIN) }
+                )
+            }
+        }
+
+        // ШАР ЗАВАНТАЖЕННЯ
+        if (authState is AuthState.Loading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = PrimaryBlue)
+            }
+        }
+    }
 }
