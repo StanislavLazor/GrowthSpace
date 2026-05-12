@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.ui.theme.*
@@ -37,7 +38,6 @@ fun ProfileScreen(
     onLegalClick: (String) -> Unit = {},
     viewModel: ProfileViewModel = koinViewModel()
 ) {
-    // Слухаємо стан
     val profileState by viewModel.profileState.collectAsState()
 
     Scaffold(
@@ -65,7 +65,6 @@ fun ProfileScreen(
                 }
                 is ProfileState.Success -> {
                     val user = state.user
-                    // Беремо першу літеру імені для аватарки (якщо імені немає, буде 'U')
                     val firstLetter = user.name.firstOrNull()?.uppercase() ?: "U"
 
                     Column(
@@ -77,20 +76,22 @@ fun ProfileScreen(
                     ) {
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // Картка профілю
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp)
                                 .background(
                                     brush = Brush.verticalGradient(
                                         colors = listOf(SurfaceDarkElevated, Color(0xFF162B44).copy(alpha = 0.5f))
                                     ),
                                     shape = RoundedCornerShape(32.dp)
-                                ),
-                            contentAlignment = Alignment.Center
+                                )
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 32.dp, bottom = 24.dp)
+                            ) {
                                 Box(contentAlignment = Alignment.BottomEnd) {
                                     Box(
                                         modifier = Modifier
@@ -117,9 +118,39 @@ fun ProfileScreen(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
-
                                 Text(text = user.name, color = TextWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                                 Text(text = user.email, color = TextGray, fontSize = 14.sp)
+
+                                if (user.bio.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(24.dp))
+
+                                    // Тонкий роздільник
+                                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 1.dp, modifier = Modifier.padding(horizontal = 24.dp))
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Заголовок "Про мене"
+                                    Text(
+                                        text = "Про мене",
+                                        color = TextWhite,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                                        textAlign = TextAlign.Start
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Самий текст bio
+                                    Text(
+                                        text = user.bio,
+                                        color = TextGray,
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                                        textAlign = TextAlign.Start
+                                    )
+                                }
                             }
                         }
 
@@ -134,46 +165,30 @@ fun ProfileScreen(
                             modifier = Modifier.align(Alignment.Start).padding(bottom = 16.dp)
                         )
 
-                        // Блок налаштувань
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(SurfaceDarkElevated, RoundedCornerShape(24.dp))
                                 .clip(RoundedCornerShape(24.dp))
                         ) {
-                            // Відображаємо роль юзера
                             val roleText = if (user.role == "coach") "Коуч" else "Клієнт"
                             SettingsItem(icon = Icons.Outlined.Person, title = "Ваша роль", value = roleText)
                             SettingsDivider()
-
-                            SettingsItem(
-                                icon = Icons.Outlined.Description,
-                                title = "Умови користування",
-                                onClick = { onLegalClick("terms") }
-                            )
+                            SettingsItem(icon = Icons.Outlined.Description, title = "Умови користування", onClick = { onLegalClick("terms") })
                             SettingsDivider()
-                            SettingsItem(
-                                icon = Icons.Outlined.Policy,
-                                title = "Політика компанії",
-                                onClick = { onLegalClick("policy") }
-                            )
+                            SettingsItem(icon = Icons.Outlined.Policy, title = "Політика компанії", onClick = { onLegalClick("policy") })
                             SettingsDivider()
-
                             SettingsItem(icon = Icons.Outlined.Notifications, title = "Сповіщення")
                         }
 
                         Spacer(modifier = Modifier.height(40.dp))
 
-                        // Кнопка виходу
                         OutlinedButton(
                             onClick = {
-                                viewModel.logout() // Виходимо з Firebase
-                                onLogoutClick()    // Переходимо на логін
+                                viewModel.logout()
+                                onLogoutClick()
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .padding(bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().height(56.dp).padding(bottom = 8.dp),
                             shape = RoundedCornerShape(28.dp),
                             border = BorderStroke(1.dp, Color(0xFFE91E63).copy(alpha = 0.3f)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE91E63))
@@ -193,44 +208,21 @@ fun ProfileScreen(
 }
 
 @Composable
-fun SettingsItem(
-    icon: ImageVector,
-    title: String,
-    value: String? = null,
-    onClick: () -> Unit = {}
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(SurfaceDark, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
+fun SettingsItem(icon: ImageVector, title: String, value: String? = null, onClick: () -> Unit = {}) {
+    Row(modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(40.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
         }
         Spacer(modifier = Modifier.width(16.dp))
-
         Text(title, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-
         if (value != null) {
             Text(value, color = TextGray, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 8.dp))
         }
-
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextGray)
     }
 }
 
 @Composable
 fun SettingsDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        color = BackgroundDark,
-        thickness = 1.dp
-    )
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = BackgroundDark, thickness = 1.dp)
 }
