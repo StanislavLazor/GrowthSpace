@@ -35,16 +35,21 @@ fun MainScreen(onLogout: () -> Unit,
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Визначаємо, чи потрібно ховати нижнє меню (якщо ми на екрані дати АБО підтвердження)
-    val isBookingFlow = currentRoute?.startsWith("booking_date") == true ||
-            currentRoute?.startsWith("booking_time") == true ||
-            currentRoute?.startsWith("booking_confirmation") == true ||
-            currentRoute?.startsWith("booking_status") == true
+    // СПИСОК МАРШРУТІВ, ДЕ МЕНЮ МАЄ БУТИ ВИДИМИМ
+    val bottomNavRoutes = listOf(
+        Routes.HOME,
+        "sessions",
+        "chat",
+        "progress",
+        "profile"
+    )
+
+    // Показуємо меню, тільки якщо поточний маршрут є у списку головних вкладок
+    val showBottomBar = currentRoute in bottomNavRoutes
 
     Scaffold(
         bottomBar = {
-            // ХОВАЄМО МЕНЮ, ЯКЩО МИ В ПРОЦЕСІ БРОНЮВАННЯ
-            if (!isBookingFlow) {
+            if (showBottomBar) {
                 BottomNavigationBar(navController = navController)
             }
         }
