@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,14 +27,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.ui.theme.*
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onLogoutClick: () -> Unit,
     onEditAvatarClick: () -> Unit = {},
-    onLegalClick: (String) -> Unit = {}
+    onLegalClick: (String) -> Unit = {},
+    viewModel: ProfileViewModel = koinViewModel()
 ) {
+    // Слухаємо стан
+    val profileState by viewModel.profileState.collectAsState()
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = BackgroundDark,
@@ -43,118 +50,144 @@ fun ProfileScreen(
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()), // ДОДАНО СКРОЛ
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            when (val state = profileState) {
+                is ProfileState.Loading -> {
+                    CircularProgressIndicator(color = PrimaryBlue)
+                }
+                is ProfileState.Error -> {
+                    Text(text = state.message, color = StatusCanceled, fontSize = 16.sp)
+                }
+                is ProfileState.Success -> {
+                    val user = state.user
+                    // Беремо першу літеру імені для аватарки (якщо імені немає, буде 'U')
+                    val firstLetter = user.name.firstOrNull()?.uppercase() ?: "U"
 
-            // Картка профілю
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(SurfaceDarkElevated, Color(0xFF162B44).copy(alpha = 0.5f))
-                        ),
-                        shape = RoundedCornerShape(32.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(contentAlignment = Alignment.BottomEnd) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 20.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Картка профілю
                         Box(
                             modifier = Modifier
-                                .size(100.dp)
-                                .border(2.dp, PrimaryBlue, CircleShape)
-                                .padding(4.dp)
-                                .clip(CircleShape)
-                                .background(SurfaceDark)
-                        ) {
-                            Text("М", color = TextWhite, fontSize = 40.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(SurfaceDark, CircleShape)
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                                .clip(CircleShape)
-                                .clickable { onEditAvatarClick() }
-                                .padding(6.dp),
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(SurfaceDarkElevated, Color(0xFF162B44).copy(alpha = 0.5f))
+                                    ),
+                                    shape = RoundedCornerShape(32.dp)
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit Avatar", tint = PrimaryBlue, modifier = Modifier.size(16.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(contentAlignment = Alignment.BottomEnd) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .border(2.dp, PrimaryBlue, CircleShape)
+                                            .padding(4.dp)
+                                            .clip(CircleShape)
+                                            .background(SurfaceDark)
+                                    ) {
+                                        Text(firstLetter, color = TextWhite, fontSize = 40.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(SurfaceDark, CircleShape)
+                                            .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                                            .clip(CircleShape)
+                                            .clickable { onEditAvatarClick() }
+                                            .padding(6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Edit Avatar", tint = PrimaryBlue, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text(text = user.name, color = TextWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                Text(text = user.email, color = TextGray, fontSize = 14.sp)
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        Text(
+                            text = "НАЛАШТУВАННЯ",
+                            color = TextGray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.align(Alignment.Start).padding(bottom = 16.dp)
+                        )
+
+                        // Блок налаштувань
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(SurfaceDarkElevated, RoundedCornerShape(24.dp))
+                                .clip(RoundedCornerShape(24.dp))
+                        ) {
+                            // Відображаємо роль юзера
+                            val roleText = if (user.role == "coach") "Коуч" else "Клієнт"
+                            SettingsItem(icon = Icons.Outlined.Person, title = "Ваша роль", value = roleText)
+                            SettingsDivider()
+
+                            SettingsItem(
+                                icon = Icons.Outlined.Description,
+                                title = "Умови користування",
+                                onClick = { onLegalClick("terms") }
+                            )
+                            SettingsDivider()
+                            SettingsItem(
+                                icon = Icons.Outlined.Policy,
+                                title = "Політика компанії",
+                                onClick = { onLegalClick("policy") }
+                            )
+                            SettingsDivider()
+
+                            SettingsItem(icon = Icons.Outlined.Notifications, title = "Сповіщення")
+                        }
+
+                        Spacer(modifier = Modifier.height(40.dp))
+
+                        // Кнопка виходу
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.logout() // Виходимо з Firebase
+                                onLogoutClick()    // Переходимо на логін
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .padding(bottom = 8.dp),
+                            shape = RoundedCornerShape(28.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE91E63).copy(alpha = 0.3f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE91E63))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Вийти з акаунту", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "Марія Коваленко", color = TextWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 }
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "НАЛАШТУВАННЯ",
-                color = TextGray,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                modifier = Modifier.align(Alignment.Start).padding(bottom = 16.dp)
-            )
-
-            // Блок налаштувань
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceDarkElevated, RoundedCornerShape(24.dp))
-                    .clip(RoundedCornerShape(24.dp))
-            ) {
-                SettingsItem(icon = Icons.Outlined.Person, title = "Персональні дані")
-                SettingsDivider()
-
-                // Юридичні пункти
-                SettingsItem(
-                    icon = Icons.Outlined.Description,
-                    title = "Умови користування",
-                    onClick = { onLegalClick("terms") }
-                )
-                SettingsDivider()
-                SettingsItem(
-                    icon = Icons.Outlined.Policy,
-                    title = "Політика компанії",
-                    onClick = { onLegalClick("policy") }
-                )
-                SettingsDivider()
-
-                SettingsItem(icon = Icons.Outlined.Notifications, title = "Сповіщення")
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // Кнопка виходу
-            OutlinedButton(
-                onClick = onLogoutClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(bottom = 8.dp),
-                shape = RoundedCornerShape(28.dp),
-                border = BorderStroke(1.dp, Color(0xFFE91E63).copy(alpha = 0.3f)),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE91E63))
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Вийти з акаунту", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
