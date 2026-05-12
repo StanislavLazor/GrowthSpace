@@ -29,12 +29,12 @@ import java.time.YearMonth
 
 @Composable
 fun BookingDateScreen(
-    coachId: Int,
+    coachId: String,
     onBackClick: () -> Unit,
     onNextClick: (LocalDate) -> Unit
 ) {
     // Знаходимо коуча за ID
-    val coach = dummyCoaches.find { it.id == coachId } ?: dummyCoaches.first()
+    val coach = dummyCoaches.find { it.id.toString() == coachId } ?: dummyCoaches.first()
 
     // Стейт для обраної дати
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -272,5 +272,5 @@ fun getUkrainianMonthName(month: Int): String {
 @Preview(showBackground = true)
 @Composable
 fun BookingDateScreenPreview() {
-    BookingDateScreen(coachId = 1, onBackClick = {}, onNextClick = {})
+    BookingDateScreen(coachId = "1", onBackClick = {}, onNextClick = {})
 }
