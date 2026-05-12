@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.lazor.growthspace" />
+                  <option name="mobileSdkAppId" value="1:576112425254:android:26d7d418aa78bac1b069e7" />
+                  <option name="projectId" value="growthspace-c260392e" />
+                  <option name="projectNumber" value="576112425254" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

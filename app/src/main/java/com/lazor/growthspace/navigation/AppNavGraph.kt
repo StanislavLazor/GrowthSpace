@@ -15,56 +15,23 @@ fun AppNavGraph() {
 
     NavHost(
         navController = navController,
-        startDestination = Routes.REGISTER
+        startDestination = Routes.LOGIN // Починаємо з логіну
     ) {
-        // Екран Логіну
+        // Екран Логіну - тепер приймає тільки navController
         composable(Routes.LOGIN) {
-            LoginScreen(
-                onLoginSuccess = {
-                    // Перехід у додаток та очищення історії навігації (щоб не повернутися на логін)
-                    navController.navigate(Routes.MAIN_APP) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
-                onNavigateToRegister = {
-                    navController.navigate(Routes.REGISTER)
-                },
-                onNavigateToForgotPassword = {
-                    navController.navigate(Routes.FORGOT_PASSWORD)
-                }
-            )
+            LoginScreen(navController = navController)
         }
 
-        // Екран Реєстрації
+        // Екран Реєстрації - тепер приймає тільки navController
         composable(Routes.REGISTER) {
-            RegisterScreen(
-                onRegisterSuccess = {
-                    // Перехід у додаток та очищення історії
-                    navController.navigate(Routes.MAIN_APP) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
-                onLoginClick = {
-                    navController.navigate(Routes.LOGIN) {
-                        popUpTo(Routes.REGISTER) { inclusive = true }
-                    }
-                },
-                onNavigateToLegal = { type ->
-                    navController.navigate("legal/$type")
-                }
-            )
+            RegisterScreen(navController = navController)
         }
 
-        // Екран відновлення пароля
+        // Екран відновлення пароля (залишаємо як було, поки не переписали його UI)
         composable(Routes.FORGOT_PASSWORD) {
             ForgotPasswordScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                onSendLinkClick = { email ->
-                    // Тимчасова заглушка для кнопки
-                    println("Відправлено на $email")
-                }
+                onBackClick = { navController.popBackStack() },
+                onSendLinkClick = { email -> println("Відправлено на $email") }
             )
         }
 
@@ -82,12 +49,14 @@ fun AppNavGraph() {
             )
         }
 
-        // Екран для юридичних текстів (Умови та Політика)
+        // Екрани Умов та Політики
         composable("legal/{type}") { backStackEntry ->
             val type = backStackEntry.arguments?.getString("type") ?: "terms"
-
             val title = if (type == "terms") "Умови користування" else "Політика компанії"
-            val text = if (type == "terms") com.lazor.growthspace.ui.LegalData.termsText else com.lazor.growthspace.ui.LegalData.policyText
+            val text = if (type == "terms")
+                com.lazor.growthspace.ui.LegalData.termsText
+            else
+                com.lazor.growthspace.ui.LegalData.policyText
 
             com.lazor.growthspace.ui.legal.LegalScreen(
                 title = title,
