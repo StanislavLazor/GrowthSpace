@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,10 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.ui.theme.*
+import com.lazor.growthspace.ui.session.SessionsViewModel
+import kotlinx.coroutines.delay
+import org.koin.androidx.compose.koinViewModel
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,13 +35,27 @@ fun BookingTimeScreen(
     selectedDate: String,
     onBackClick: () -> Unit,
     onChangeDateClick: () -> Unit,
-    onConfirmClick: (String) -> Unit
+    onConfirmClick: (String) -> Unit,
+    viewModel: SessionsViewModel = koinViewModel()
 ) {
-    var selectedDuration by remember { mutableIntStateOf(60) }
     var selectedTime by remember { mutableStateOf<String?>(null) }
-
-    // Форматуємо дату для красивого відображення
     val displayDate = formatToDisplayDate(selectedDate)
+
+    // Анімація завантаження, щоб екран не блимав порожнім списком
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(coachId) {
+        viewModel.loadAvailableSlotsForCoach(coachId)
+        delay(600) // Даємо Firebase частку секунди на отримання даних
+        isLoading = false
+    }
+
+    val coachSlots by viewModel.coachAvailableSlots.collectAsState()
+    val slotsForDate = coachSlots.filter { it.date == selectedDate }.sortedBy { it.time }
+
+    val morningSlots = slotsForDate.filter { it.time < "12:00" }
+    val daySlots = slotsForDate.filter { it.time in "12:00".."16:59" }
+    val eveningSlots = slotsForDate.filter { it.time >= "17:00" }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -47,9 +63,7 @@ fun BookingTimeScreen(
             CenterAlignedTopAppBar(
                 title = { Text("Вибір часу", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = TextWhite)
-                    }
+                    IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = TextWhite) }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BackgroundDark)
             )
@@ -59,34 +73,18 @@ fun BookingTimeScreen(
                 Button(
                     onClick = { selectedTime?.let { onConfirmClick(it) } },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryBlue,
-                        disabledContainerColor = SurfaceDark
-                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue, disabledContainerColor = SurfaceDark),
                     shape = RoundedCornerShape(28.dp),
-                    enabled = selectedTime != null // Активна тільки якщо вибрано час
+                    enabled = selectedTime != null
                 ) {
-                    Text(text = "Підтвердити", color = if (selectedTime != null) TextWhite else TextGray, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Підтвердити", color = if (selectedTime != null) TextWhite else TextGray, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-        ) {
-            // Картка обраної дати
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceDarkElevated, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+
+            Row(modifier = Modifier.fillMaxWidth().background(SurfaceDarkElevated, RoundedCornerShape(16.dp)).padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text("Обрана дата", color = TextGray, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -95,81 +93,37 @@ fun BookingTimeScreen(
                 Text("Змінити", color = PrimaryBlue, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.clickable { onChangeDateClick() })
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Тривалість сесії
-            Text("Тривалість сесії", color = TextGray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf(30, 60, 90).forEach { duration ->
-                    DurationChip(
-                        text = "$duration хв",
-                        isSelected = selectedDuration == duration,
-                        onClick = { selectedDuration = duration }
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(32.dp))
 
-            Text("Доступний час", color = TextGray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 16.dp))
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = PrimaryBlue)
+                }
+            } else if (slotsForDate.isEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                    Text("На цю дату більше немає вільних слотів.", color = TextGray, fontSize = 16.sp, textAlign = TextAlign.Center)
+                }
+            } else {
+                Text("Доступний час", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
 
-            // РАНОК
-            TimeSectionRow(icon = Icons.Default.LightMode, title = "Ранок")
-            TimeGrid(
-                slots = listOf(
-                    TimeSlot("09:00", true), TimeSlot("09:30", true), TimeSlot("10:00", false),
-                    TimeSlot("10:30", false), TimeSlot("11:00", true), TimeSlot("11:30", true)
-                ),
-                selectedTime = selectedTime,
-                onTimeSelect = { selectedTime = it }
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ДЕНЬ
-            TimeSectionRow(icon = Icons.Default.WbSunny, title = "День")
-            TimeGrid(
-                slots = listOf(
-                    TimeSlot("12:00", false), TimeSlot("12:30", true), TimeSlot("13:00", true),
-                    TimeSlot("13:30", true), TimeSlot("14:00", true), TimeSlot("14:30", true),
-                    TimeSlot("15:00", true), TimeSlot("15:30", false), TimeSlot("16:00", true)
-                ),
-                selectedTime = selectedTime,
-                onTimeSelect = { selectedTime = it }
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ВЕЧІР
-            TimeSectionRow(icon = Icons.Default.Nightlight, title = "Вечір")
-            TimeGrid(
-                slots = listOf(
-                    TimeSlot("17:00", true), TimeSlot("17:30", true), TimeSlot("18:00", true),
-                    TimeSlot("18:30", false), TimeSlot("19:00", true)
-                ),
-                selectedTime = selectedTime,
-                onTimeSelect = { selectedTime = it }
-            )
-
+                if (morningSlots.isNotEmpty()) {
+                    TimeSectionRow(icon = Icons.Default.LightMode, title = "Ранок")
+                    TimeGrid(slots = morningSlots.map { it.time }, selectedTime = selectedTime, onTimeSelect = { selectedTime = it })
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+                if (daySlots.isNotEmpty()) {
+                    TimeSectionRow(icon = Icons.Default.WbSunny, title = "День")
+                    TimeGrid(slots = daySlots.map { it.time }, selectedTime = selectedTime, onTimeSelect = { selectedTime = it })
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+                if (eveningSlots.isNotEmpty()) {
+                    TimeSectionRow(icon = Icons.Default.Nightlight, title = "Вечір")
+                    TimeGrid(slots = eveningSlots.map { it.time }, selectedTime = selectedTime, onTimeSelect = { selectedTime = it })
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
             Spacer(modifier = Modifier.height(40.dp))
         }
-    }
-}
-
-// Допоміжні компоненти
-
-@Composable
-fun DurationChip(text: String, isSelected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (isSelected) PrimaryBlue.copy(alpha = 0.1f) else Color.Transparent)
-            .border(1.dp, if (isSelected) PrimaryBlue else SurfaceDark, RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 24.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text, color = if (isSelected) PrimaryBlue else TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -183,49 +137,25 @@ fun TimeSectionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title:
 }
 
 @Composable
-fun TimeGrid(slots: List<TimeSlot>, selectedTime: String?, onTimeSelect: (String) -> Unit) {
+fun TimeGrid(slots: List<String>, selectedTime: String?, onTimeSelect: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         slots.chunked(3).forEach { rowSlots ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowSlots.forEach { slot ->
-                    TimeChip(
-                        time = slot.time,
-                        isAvailable = slot.isAvailable,
-                        isSelected = selectedTime == slot.time,
-                        onClick = { onTimeSelect(slot.time) },
-                        modifier = Modifier.weight(1f)
-                    )
+                rowSlots.forEach { time ->
+                    TimeChip(time = time, isSelected = selectedTime == time, onClick = { onTimeSelect(time) }, modifier = Modifier.weight(1f))
                 }
-                // Заповнюємо порожні місця, якщо в рядку менше 3 елементів
-                repeat(3 - rowSlots.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                repeat(3 - rowSlots.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-fun TimeChip(time: String, isAvailable: Boolean, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) PrimaryBlue else SurfaceDarkElevated)
-            .clickable(enabled = isAvailable) { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = time,
-            color = if (isSelected) BackgroundDark else if (isAvailable) TextWhite else TextGray.copy(alpha = 0.3f),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            textDecoration = if (!isAvailable) TextDecoration.LineThrough else TextDecoration.None
-        )
+fun TimeChip(time: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.height(48.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) PrimaryBlue else SurfaceDarkElevated).clickable { onClick() }, contentAlignment = Alignment.Center) {
+        Text(text = time, color = if (isSelected) BackgroundDark else TextWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold)
     }
 }
-
-data class TimeSlot(val time: String, val isAvailable: Boolean)
 
 fun formatToDisplayDate(dateStr: String): String {
     return try {

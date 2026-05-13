@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -38,6 +37,7 @@ fun ProfileScreen(
     onLogoutClick: () -> Unit,
     onEditAvatarClick: () -> Unit = {},
     onLegalClick: (String) -> Unit = {},
+    onScheduleClick: () -> Unit = {}, // ДОДАНО КОЛБЕК ДЛЯ РОЗКЛАДУ
     viewModel: ProfileViewModel = koinViewModel()
 ) {
     val profileState by viewModel.profileState.collectAsState()
@@ -123,7 +123,20 @@ fun ProfileScreen(
                                     Text("Редагувати профіль", color = TextWhite, fontSize = 14.sp)
                                 }
 
+                                // ДОДАНО КНОПКУ КЕРУВАННЯ РОЗКЛАДОМ ДЛЯ КОУЧА
                                 if (user.role == "coach") {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(
+                                        onClick = onScheduleClick,
+                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.height(44.dp).padding(horizontal = 24.dp).fillMaxWidth(0.8f)
+                                    ) {
+                                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = BackgroundDark)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Керувати розкладом", color = BackgroundDark, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text(user.specialization.ifBlank { "Коуч" }, color = PrimaryBlue, fontSize = 14.sp)
                                     Spacer(modifier = Modifier.height(16.dp))
@@ -175,8 +188,6 @@ fun ProfileScreen(
     }
 }
 
-// ДОДАЙ ЦІ КОМПОНЕНТИ ВНИЗУ ФАЙЛУ (Їх не вистачає на скриншоті):
-
 @Composable
 fun InfoStatColumn(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -196,7 +207,7 @@ fun SettingsItem(icon: ImageVector, title: String, value: String? = null, onClic
         if (value != null) {
             Text(value, color = TextGray, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 8.dp))
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextGray)
+        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = TextGray)
     }
 }
 

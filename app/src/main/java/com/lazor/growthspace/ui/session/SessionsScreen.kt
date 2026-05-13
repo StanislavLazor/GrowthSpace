@@ -11,10 +11,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Videocam
@@ -27,12 +30,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lazor.growthspace.data.model.SessionBooking
 import com.lazor.growthspace.ui.theme.*
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionsScreen() {
+fun SessionsScreen(
+    viewModel: SessionsViewModel = koinViewModel()
+) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0 - Майбутні, 1 - Минулі
+
+    // ПІДКЛЮЧАЄМО VIEWMODEL
+    val state by viewModel.state.collectAsState()
+
+    // Сортуємо сесії на майбутні і минулі
+    val upcomingSessions = state.sessions.filter { it.status in listOf("pending", "confirmed", "available") }
+    val pastSessions = state.sessions.filter { it.status in listOf("completed", "cancelled") }
+
+    val isCoach = state.currentUser?.role == "coach"
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -63,7 +79,6 @@ fun SessionsScreen() {
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Плавний перемикач (Слайдер)
             AnimatedTabSwitch(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it }
@@ -71,21 +86,219 @@ fun SessionsScreen() {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Перемикання списків з анімацією розчинення
-            Crossfade(targetState = selectedTab, label = "ListTransition") { tab ->
-                if (tab == 0) {
-                    UpcomingSessionsList()
-                } else {
-                    PastSessionsList()
+            if (state.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = PrimaryBlue)
+                }
+            } else {
+                Crossfade(targetState = selectedTab, label = "ListTransition") { tab ->
+                    if (tab == 0) {
+                        if (upcomingSessions.isEmpty()) {
+                            EmptyStateMessage("У вас немає майбутніх сесій")
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                items(upcomingSessions) { session ->
+                                    DynamicSessionCard(
+                                        session = session,
+                                        isCoach = isCoach,
+                                        onConfirm = { viewModel.updateSessionStatus(session.id, "confirmed") },
+                                        onCancel = { viewModel.updateSessionStatus(session.id, "cancelled") }
+                                    )
+                                }
+                                item { Spacer(modifier = Modifier.height(80.dp)) }
+                            }
+                        }
+                    } else {
+                        if (pastSessions.isEmpty()) {
+                            EmptyStateMessage("Історія сесій порожня")
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                items(pastSessions) { session ->
+                                    PastSessionCard(
+                                        name = if (isCoach) session.clientName else session.coachName,
+                                        specialization = if (isCoach) "Клієнт" else "Коуч",
+                                        date = session.date,
+                                        time = session.time,
+                                        statusText = getStatusText(session.status),
+                                        statusBgColor = if (session.status == "cancelled") Color(0xFF3E1A1A) else SurfaceDarkElevated,
+                                        statusTextColor = if (session.status == "cancelled") Color(0xFFFF5252) else TextGray,
+                                        showRepeatButton = session.status == "completed" && !isCoach
+                                    )
+                                }
+                                item { Spacer(modifier = Modifier.height(80.dp)) }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-// ==========================================
-// КОМПОНЕНТ ПЛАВНОГО ПЕРЕМИКАЧА (ТАБІВ)
-// ==========================================
+@Composable
+fun EmptyStateMessage(message: String) {
+    Box(modifier = Modifier.fillMaxSize().padding(bottom = 100.dp), contentAlignment = Alignment.Center) {
+        Text(message, color = TextGray, fontSize = 16.sp)
+    }
+}
+
+// ДОПОМІЖНІ ФУНКЦІЇ ДЛЯ СТАТУСІВ
+fun getStatusText(status: String): String = when(status) {
+    "available" -> "Вільний слот"
+    "pending" -> "Очікує підтвердження"
+    "confirmed" -> "Підтверджено"
+    "completed" -> "Завершено"
+    "cancelled" -> "Скасовано"
+    else -> status
+}
+
+fun getStatusColor(status: String): Color = when(status) {
+    "available" -> Color(0xFF00BCD4)
+    "pending" -> Color(0xFFFFA000)
+    "confirmed" -> Color(0xFF00E676)
+    "cancelled" -> Color(0xFFFF5252)
+    else -> TextGray
+}
+
+@Composable
+fun DynamicSessionCard(
+    session: SessionBooking,
+    isCoach: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val displayName = if (isCoach) {
+        if (session.clientId.isEmpty()) "Вільний слот" else session.clientName
+    } else {
+        session.coachName
+    }
+
+    val specialization = if (isCoach) {
+        if (session.clientId.isEmpty()) "Ніхто ще не записався" else "Клієнт"
+    } else {
+        "Ваш коуч"
+    }
+
+    val statusColor = getStatusColor(session.status)
+    val statusText = getStatusText(session.status)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
+            .padding(16.dp)
+    ) {
+        // Хедер
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Row {
+                Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
+                    val initial = if (displayName.isNotEmpty() && displayName != "Вільний слот") displayName.take(1) else "?"
+                    Text(initial, color = TextWhite, fontWeight = FontWeight.Bold)
+                    if (session.status == "confirmed") {
+                        Box(modifier = Modifier.size(12.dp).background(Color(0xFF00E676), CircleShape).border(2.dp, BackgroundDark, CircleShape).align(Alignment.BottomEnd))
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(displayName, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(specialization, color = TextGray, fontSize = 14.sp)
+                }
+            }
+            Surface(color = statusColor.copy(alpha = 0.15f), shape = RoundedCornerShape(12.dp)) {
+                Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(6.dp).background(statusColor, CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(statusText, color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Дати і Час
+        Row(
+            modifier = Modifier.fillMaxWidth().background(BackgroundDark, RoundedCornerShape(12.dp)).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(session.date, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+
+            Box(modifier = Modifier.height(16.dp).width(1.dp).background(SurfaceDarkElevated))
+
+            Spacer(modifier = Modifier.width(16.dp))
+            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(session.time, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ДИНАМІЧНІ КНОПКИ ЗАЛЕЖНО ВІД СТАТУСУ ТА РОЛІ
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+
+            if (isCoach && session.status == "pending") {
+                // Коуч: Запит від клієнта
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Відхилити", fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = BackgroundDark, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Підтвердити", color = BackgroundDark, fontWeight = FontWeight.Bold)
+                }
+            } else if (session.status == "confirmed") {
+                // Підтверджена сесія для обох
+                OutlinedButton(
+                    onClick = { /* Відкрити чат */ },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SurfaceDarkElevated),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlue)
+                ) {
+                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Чат", fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = { /* Дзвінок */ },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Icon(Icons.Outlined.Videocam, contentDescription = null, tint = BackgroundDark, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Приєднатись", color = BackgroundDark, fontWeight = FontWeight.Bold)
+                }
+            } else if (isCoach && session.status == "available") {
+                // Коуч бачить свій вільний слот
+                OutlinedButton(
+                    onClick = onCancel, // Видалення слоту
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SurfaceDarkElevated),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextGray)
+                ) {
+                    Text("Видалити слот", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun AnimatedTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     BoxWithConstraints(
@@ -152,172 +365,6 @@ fun AnimatedTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     }
 }
 
-// ==========================================
-// СПИСКИ СЕСІЙ
-// ==========================================
-@Composable
-fun UpcomingSessionsList() {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            UpcomingSessionCard(
-                name = "Олександр Мельник",
-                specialization = "Кар'єрний коуч",
-                date = "Завтра, 15 Травня",
-                time = "14:00",
-                statusText = "Очікується",
-                statusColor = Color(0xFFFFA000),
-                primaryActionText = "Деталі",
-                secondaryActionText = "Чат",
-                secondaryActionIcon = Icons.Outlined.ChatBubbleOutline,
-                isPrimaryFilled = false
-            )
-        }
-        item {
-            UpcomingSessionCard(
-                name = "Марія Коваленко",
-                specialization = "Лайф-коуч",
-                date = "18 Травня",
-                time = "10:00",
-                statusText = "Підтверджено",
-                statusColor = Color(0xFF00E676),
-                primaryActionText = "Приєднатись",
-                primaryActionIcon = Icons.Outlined.Videocam,
-                secondaryActionText = "Деталі",
-                isPrimaryFilled = true
-            )
-        }
-        item { Spacer(modifier = Modifier.height(80.dp)) } // Відступ для нижнього меню
-    }
-}
-
-@Composable
-fun PastSessionsList() {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            PastSessionCard(
-                name = "Дмитро Ткаченко",
-                specialization = "Бізнес-коуч",
-                date = "10 Травня",
-                time = "16:00",
-                statusText = "Завершено",
-                statusBgColor = SurfaceDarkElevated,
-                statusTextColor = TextGray
-            )
-        }
-        item {
-            PastSessionCard(
-                name = "Анна Бойко",
-                specialization = "Фінансовий коуч",
-                date = "5 Травня",
-                time = "11:00",
-                statusText = "Скасовано",
-                statusBgColor = Color(0xFF3E1A1A), // Темно-червоний фон
-                statusTextColor = Color(0xFFFF5252), // Яскраво-червоний текст
-                showRepeatButton = false
-            )
-        }
-        item { Spacer(modifier = Modifier.height(80.dp)) }
-    }
-}
-
-// ==========================================
-// КАРТКИ ДЛЯ СПИСКІВ
-// ==========================================
-@Composable
-fun UpcomingSessionCard(
-    name: String, specialization: String, date: String, time: String,
-    statusText: String, statusColor: Color,
-    primaryActionText: String, primaryActionIcon: ImageVector? = null, isPrimaryFilled: Boolean,
-    secondaryActionText: String, secondaryActionIcon: ImageVector? = null
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
-            .padding(16.dp)
-    ) {
-        // Хедер картки (Коуч + Статус)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-            Row {
-                Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                    Text(name.take(1), color = TextWhite, fontWeight = FontWeight.Bold)
-                    Box(modifier = Modifier.size(12.dp).background(Color(0xFF00E676), CircleShape).border(2.dp, BackgroundDark, CircleShape).align(Alignment.BottomEnd))
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(name, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text(specialization, color = TextGray, fontSize = 14.sp)
-                }
-            }
-            // Badge статусу
-            Surface(color = statusColor.copy(alpha = 0.15f), shape = RoundedCornerShape(12.dp)) {
-                Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(6.dp).background(statusColor, CircleShape))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(statusText, color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Блок Дати та Часу
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BackgroundDark, RoundedCornerShape(12.dp))
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(date, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-
-            Box(modifier = Modifier.height(16.dp).width(1.dp).background(SurfaceDarkElevated))
-
-            Spacer(modifier = Modifier.width(16.dp))
-            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp)) // Заміни на іконку годинника, якщо є
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(time, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Кнопки
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Вторинна кнопка (Чат або Деталі)
-            OutlinedButton(
-                onClick = { },
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, SurfaceDarkElevated),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlue)
-            ) {
-                if (secondaryActionIcon != null) {
-                    Icon(secondaryActionIcon, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(secondaryActionText, fontWeight = FontWeight.Bold)
-            }
-
-            // Первинна кнопка (Деталі або Приєднатись)
-            Button(
-                onClick = { },
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (isPrimaryFilled) PrimaryBlue else Color.Transparent),
-                border = if (!isPrimaryFilled) BorderStroke(1.dp, SurfaceDarkElevated) else null
-            ) {
-                if (primaryActionIcon != null) {
-                    Icon(primaryActionIcon, contentDescription = null, tint = BackgroundDark, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(primaryActionText, color = if (isPrimaryFilled) BackgroundDark else TextWhite, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
 @Composable
 fun PastSessionCard(
     name: String, specialization: String, date: String, time: String,
@@ -333,7 +380,8 @@ fun PastSessionCard(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Row {
                 Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                    Text(name.take(1), color = TextWhite, fontWeight = FontWeight.Bold)
+                    val initial = if (name.isNotEmpty()) name.take(1) else "?"
+                    Text(initial, color = TextWhite, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
