@@ -14,78 +14,68 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lazor.growthspace.data.model.Goal
 import com.lazor.growthspace.ui.theme.*
-
-// Моделі даних для наших цілей та завдань
-data class TaskItem(val id: Int, val title: String, val initialCompleted: Boolean)
-
-data class GoalData(
-    val title: String,
-    val coach: String,
-    val color: Color,
-    val tasks: SnapshotStateList<TaskItem>
-)
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProgressScreen() {
+fun ProgressScreen(
+    viewModel: ProgressViewModel = koinViewModel()
+) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showAddGoalDialog by remember { mutableStateOf(false) }
+    val allGoals by viewModel.goals.collectAsState()
 
-    // 1. СТВОРЮЄМО СПИСКИ ЗАВДАНЬ
-    val leadershipTasks = remember {
-        mutableStateListOf(
-            TaskItem(1, "Прочитати книгу з менеджменту", true),
-            TaskItem(2, "Провести 1-on-1 з командою", false),
-            TaskItem(3, "Підготувати презентацію стратегії", false)
-        )
-    }
-    val speakingTasks = remember {
-        mutableStateListOf(
-            TaskItem(4, "Записати відео-пітч", true),
-            TaskItem(5, "Виступити на мітапі", false)
-        )
-    }
-    val timeTasks = remember {
-        mutableStateListOf(
-            TaskItem(6, "Впровадити Pomodoro", true),
-            TaskItem(7, "Планування тижня", true)
-        )
-    }
+    val activeGoals = allGoals.filter { goal -> goal.tasks.any { !it.isCompleted } || goal.tasks.isEmpty() }
+    val completedGoals = allGoals.filter { goal -> goal.tasks.isNotEmpty() && goal.tasks.all { it.isCompleted } }
 
-    // 2. ОБ'ЄДНУЄМО ЇХ В ЄДИНУ БАЗУ ЦІЛЕЙ
-    val allGoals = remember {
-        listOf(
-            GoalData("Лідерські навички", "Олександр Мельник", PrimaryBlue, leadershipTasks),
-            GoalData("Публічні виступи", "Марія Коваленко", Color(0xFFFFA000), speakingTasks),
-            GoalData("Тайм-менеджмент", "Дмитро Ткаченко", Color(0xFF00E676), timeTasks)
-        )
-    }
-
-    // 3. ДИНАМІЧНЕ СОРТУВАННЯ (Магія тут!)
-    // Активна ціль — це та, де є хоча б ОДНЕ невиконане завдання
-    val activeGoals = allGoals.filter { goal -> goal.tasks.any { !it.initialCompleted } }
-    // Завершена ціль — це та, де ВСІ завдання виконані
-    val completedGoals = allGoals.filter { goal -> goal.tasks.all { it.initialCompleted } }
-
-    // 4. ДИНАМІЧНА СТАТИСТИКА
     val totalTasksCount = allGoals.sumOf { it.tasks.size }
-    val completedTasksCount = allGoals.sumOf { goal -> goal.tasks.count { it.initialCompleted } }
+    val completedTasksCount = allGoals.sumOf { goal -> goal.tasks.count { it.isCompleted } }
     val activeTasksCount = totalTasksCount - completedTasksCount
 
     val globalProgress = if (totalTasksCount > 0) completedTasksCount.toFloat() / totalTasksCount else 0f
     val globalProgressPercent = (globalProgress * 100).toInt()
+
+    // ПАЛІТРА КОЛЬОРІВ ДЛЯ ЦІЛЕЙ (Без червоного і зеленого)
+    val activeGoalPalette = listOf(
+        Color(0xFF2196F3),
+        Color(0xFFC949E0),
+        Color(0xFF00BCD4),
+        Color(0xFF3F51B5),
+        Color(0xFF673AB7),
+        Color(0xFF9C27B0),
+        Color(0xFFE91E63),
+        Color(0xFFFF4081),
+        Color(0xFFFF9800),
+        Color(0xFFFF9900),
+        Color(0xFFFFC107)
+    )
+
+    // Колір успіху для завершених цілей
+    val successGreen = Color(0xFF00E676)
+
+    if (showAddGoalDialog) {
+        AddGoalDialog(
+            onDismiss = { showAddGoalDialog = false },
+            onConfirm = { title, desc, tasks ->
+                viewModel.addGoal(title, desc, tasks)
+                showAddGoalDialog = false
+            }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -95,7 +85,7 @@ fun ProgressScreen() {
                 title = { Text("Мій прогрес", color = TextWhite, fontSize = 28.sp, fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(
-                        onClick = { /* TODO: Add goal */ },
+                        onClick = { showAddGoalDialog = true },
                         modifier = Modifier
                             .padding(end = 16.dp)
                             .background(PrimaryBlue, CircleShape)
@@ -117,33 +107,24 @@ fun ProgressScreen() {
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // Плавний перемикач
-            item {
-                ProgressTabSwitch(selectedTab = selectedTab) { selectedTab = it }
-            }
+            item { ProgressTabSwitch(selectedTab = selectedTab) { selectedTab = it } }
 
-            // Великий круговий прогрес (ВЖЕ ДИНАМІЧНИЙ)
             item {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     GlowingCircularProgress(progress = globalProgress, text = "$globalProgressPercent%")
                 }
             }
 
-            // Плашка зі статистикою (ВЖЕ СИНХРОНІЗОВАНА З АКТИВНИМИ ЦІЛЯМИ)
-            item {
-                StatsRow(goals = activeGoals.size, tasks = activeTasksCount)
-            }
+            item { StatsRow(goals = activeGoals.size, tasks = activeTasksCount) }
 
-            // Списки карток
             item {
                 Crossfade(targetState = selectedTab, label = "ProgressTab") { tab ->
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         val goalsToShow = if (tab == 0) activeGoals else completedGoals
 
                         if (goalsToShow.isEmpty()) {
-                            // Якщо список порожній (наприклад, всі цілі виконано)
                             Text(
-                                text = if (tab == 0) "Усі цілі завершено! 🎉" else "Ще немає завершених цілей",
+                                text = if (tab == 0) "Усі цілі завершено! 🎉\nАбо ви ще нічого не додали." else "Ще немає завершених цілей",
                                 color = TextGray,
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                                 textAlign = TextAlign.Center,
@@ -151,11 +132,27 @@ fun ProgressScreen() {
                             )
                         } else {
                             goalsToShow.forEach { goal ->
+
+                                val totalTasks = goal.tasks.size
+                                val completedTasks = goal.tasks.count { it.isCompleted }
+
+                                // Логіка: якщо все виконано -> зелений, інакше -> колір з палітри
+                                val cardColor = if (totalTasks > 0 && completedTasks == totalTasks) {
+                                    successGreen
+                                } else {
+                                    val colorIndex = kotlin.math.abs(goal.id.hashCode()) % activeGoalPalette.size
+                                    activeGoalPalette[colorIndex]
+                                }
+
                                 InteractiveGoalCard(
-                                    title = goal.title,
-                                    coach = goal.coach,
-                                    color = goal.color,
-                                    tasks = goal.tasks
+                                    goal = goal,
+                                    color = cardColor,
+                                    onTaskToggle = { taskId, isCompleted ->
+                                        viewModel.toggleTask(goal.id, taskId, isCompleted)
+                                    },
+                                    onDeleteClick = {
+                                        viewModel.deleteGoal(goal.id)
+                                    }
                                 )
                             }
                         }
@@ -209,10 +206,10 @@ fun GlowingCircularProgress(progress: Float, text: String) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text, color = TextWhite, fontSize = 36.sp, fontWeight = FontWeight.Bold)
             Text(
-                text = "Загальний\nпрогрес", // <-- ВИПРАВЛЕНО ТУТ: Розбито на 2 рядки
+                text = "Загальний\nпрогрес",
                 color = TextGray,
                 fontSize = 12.sp,
-                textAlign = TextAlign.Center, // <-- Текст тепер ідеально по центру
+                textAlign = TextAlign.Center,
                 lineHeight = 16.sp
             )
         }
@@ -232,7 +229,7 @@ fun StatsRow(goals: Int, tasks: Int) {
 }
 
 @Composable
-fun StatItem(icon: androidx.compose.ui.graphics.vector.ImageVector, iconColor: Color, value: String, label: String) {
+fun StatItem(icon: ImageVector, iconColor: Color, value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.height(8.dp))
@@ -242,10 +239,14 @@ fun StatItem(icon: androidx.compose.ui.graphics.vector.ImageVector, iconColor: C
 }
 
 @Composable
-fun InteractiveGoalCard(title: String, coach: String, color: Color, tasks: SnapshotStateList<TaskItem>) {
-
-    val totalTasks = tasks.size
-    val completedTasks = tasks.count { it.initialCompleted }
+fun InteractiveGoalCard(
+    goal: Goal,
+    color: Color,
+    onTaskToggle: (String, Boolean) -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val totalTasks = goal.tasks.size
+    val completedTasks = goal.tasks.count { it.isCompleted }
     val progress = if (totalTasks > 0) completedTasks.toFloat() / totalTasks else 0f
 
     val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(600), label = "lin_progress")
@@ -253,59 +254,76 @@ fun InteractiveGoalCard(title: String, coach: String, color: Color, tasks: Snaps
     Column(
         modifier = Modifier.fillMaxWidth().background(SurfaceDarkElevated, RoundedCornerShape(24.dp)).padding(20.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column {
-                Text(title, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("Коуч: $coach", color = TextGray, fontSize = 13.sp)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(goal.title, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if(goal.description.isNotBlank()) {
+                    Text(goal.description, color = TextGray, fontSize = 13.sp)
+                }
             }
-            // <-- Відсоток тепер береться з анімованого прогресу!
-            Text("${(animatedProgress * 100).toInt()}%", color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+            // КНОПКА ВИДАЛЕННЯ
+            IconButton(
+                onClick = onDeleteClick,
+                modifier = Modifier.size(24.dp).padding(start = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Видалити",
+                    tint = Color.Red.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Box(modifier = Modifier.fillMaxWidth().height(6.dp), contentAlignment = Alignment.CenterStart) {
-            Box(modifier = Modifier.fillMaxSize().background(BackgroundDark, CircleShape))
-            if (progress > 0f) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(animatedProgress)
-                        .padding(horizontal = 2.dp)
-                        .background(brush = Brush.verticalGradient(listOf(color.copy(alpha = 0.6f), Color.Transparent)), CircleShape)
-                )
-                Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress).background(color, CircleShape))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${(animatedProgress * 100).toInt()}%", color = color, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Прогрес-бар лінійний
+            Box(modifier = Modifier.weight(1f).height(6.dp), contentAlignment = Alignment.CenterStart) {
+                Box(modifier = Modifier.fillMaxSize().background(BackgroundDark, CircleShape))
+                if (progress > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(animatedProgress)
+                            .padding(horizontal = 2.dp)
+                            .background(brush = Brush.verticalGradient(listOf(color.copy(alpha = 0.6f), Color.Transparent)), CircleShape)
+                    )
+                    Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress).background(color, CircleShape))
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // Список завдань з БД
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            tasks.forEachIndexed { index, task ->
+            goal.tasks.forEach { task ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            // <-- ЗМІНА СТАНУ ЗАВДАННЯ (оновлює ВЕСЬ екран)
-                            tasks[index] = task.copy(initialCompleted = !task.initialCompleted)
-                        }
+                        .clickable { onTaskToggle(task.id, !task.isCompleted) }
                         .padding(vertical = 4.dp)
                 ) {
                     Icon(
-                        imageVector = if (task.initialCompleted) Icons.Default.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                        imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
                         contentDescription = null,
-                        tint = if (task.initialCompleted) color else SurfaceDark,
+                        tint = if (task.isCompleted) color else SurfaceDark,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = task.title,
-                        color = if (task.initialCompleted) TextGray else TextWhite,
+                        color = if (task.isCompleted) TextGray else TextWhite,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
-                        textDecoration = if (task.initialCompleted) TextDecoration.LineThrough else TextDecoration.None
+                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                     )
                 }
             }
