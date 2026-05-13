@@ -1,23 +1,35 @@
 package com.lazor.growthspace.ui.profile
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lazor.growthspace.ui.components.CustomTextField
-import com.lazor.growthspace.ui.components.PrimaryButton
+import coil.compose.AsyncImage
 import com.lazor.growthspace.ui.theme.*
 import org.koin.androidx.compose.koinViewModel
 
@@ -31,112 +43,150 @@ fun EditProfileScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
 
-    // Стейт для полів
     var name by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
+    var specialization by remember { mutableStateOf("") }
+    var experience by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var photoUrl by remember { mutableStateOf("") }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isDataLoaded by remember { mutableStateOf(false) }
 
-    // Спостерігаємо за станом з ViewModel
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> selectedImageUri = uri }
+
     LaunchedEffect(state) {
-        when (state) {
-            is EditProfileState.Success -> {
-                if (!isDataLoaded) {
-                    val user = (state as EditProfileState.Success).user
-                    name = user.name
-                    bio = user.bio // Підтягуємо біо з БД
-                    isDataLoaded = true
-                }
-            }
-            is EditProfileState.Saved -> {
-                Toast.makeText(context, "Профіль успішно оновлено!", Toast.LENGTH_SHORT).show()
-                onSaveClick() // Повертає нас на попередній екран
-            }
-            is EditProfileState.Error -> {
-                Toast.makeText(context, (state as EditProfileState.Error).message, Toast.LENGTH_SHORT).show()
-            }
-            else -> {}
+        if (state is EditProfileState.Success && !isDataLoaded) {
+            val user = (state as EditProfileState.Success).user
+            name = user.name
+            bio = user.bio
+            specialization = user.specialization
+            experience = user.experience
+            price = user.price
+            photoUrl = user.photoUrl
+            isDataLoaded = true
+        } else if (state is EditProfileState.Saved) {
+            onSaveClick()
         }
     }
 
     Scaffold(
+        containerColor = BackgroundDark,
         topBar = {
-            TopAppBar(
-                title = { Text("Редагування", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextWhite)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+            CenterAlignedTopAppBar(
+                title = { Text("Налаштування", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+                navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = TextWhite) } },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BackgroundDark)
             )
-        },
-        containerColor = BackgroundDark
-    ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            // Крутилка при першому завантаженні даних
-            if (state is EditProfileState.Loading && !isDataLoaded) {
-                CircularProgressIndicator(color = PrimaryBlue, modifier = Modifier.align(Alignment.Center))
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp)
-                        .verticalScroll(rememberScrollState()) // Додали скрол, бо полів стало більше
-                ) {
-                    Text(
-                        text = "Особисті дані",
-                        color = TextGray,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    CustomTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = "Ім'я та Прізвище"
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text(
-                        text = "Додаткова інформація",
-                        color = TextGray,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    CustomTextField(
-                        value = bio,
-                        onValueChange = { bio = it },
-                        label = "Про себе (Bio)"
-                    )
-
-                    // Spacer.weight(1f) тут працює погано разом із verticalScroll,
-                    // тому просто робимо фіксований відступ перед кнопкою
-                    Spacer(modifier = Modifier.height(40.dp))
-
-                    PrimaryButton(
-                        text = "Зберегти зміни",
-                        isEnabled = name.isNotBlank() && state !is EditProfileState.Loading,
-                        onClick = {
-                            // Передаємо ім'я, і біо у ViewModel
-                            viewModel.saveProfile(name, bio)
-                        }
-                    )
-                }
-            }
-
-            // Оверлей завантаження під час натискання кнопки "Зберегти"
-            if (state is EditProfileState.Loading && isDataLoaded) {
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // АВАТАРКА З ЛОГІКОЮ ВИБОРУ
+            Box(contentAlignment = Alignment.BottomEnd) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f)),
+                    modifier = Modifier.size(110.dp).clip(CircleShape).background(SurfaceDarkElevated).border(2.dp, PrimaryBlue, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = PrimaryBlue)
+                    AsyncImage(
+                        model = selectedImageUri ?: photoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                SmallFloatingActionButton(
+                    onClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    containerColor = PrimaryBlue,
+                    shape = CircleShape,
+                    modifier = Modifier.size(36.dp)
+                ) { Icon(Icons.Default.PhotoCamera, null, modifier = Modifier.size(18.dp), tint = Color.White) }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // КАРТКА ОСНОВНИХ ДАНИХ
+            EditHeader("ОСОБИСТІ ДАНІ")
+            EditCard {
+                EditInputField(value = name, onValueChange = { name = it }, label = "Ім'я", icon = Icons.Default.Person)
+                HorizontalDivider(color = Color.White.copy(0.05f))
+
+                // БІО З ПІДТРИМКОЮ ENTER
+                OutlinedTextField(
+                    value = bio,
+                    onValueChange = { bio = it },
+                    placeholder = { Text("Розкажіть про себе...", color = TextGray) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = TextWhite,
+                        unfocusedTextColor = TextWhite
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                    singleLine = false
+                )
+            }
+
+            // КАРТКА ДЛЯ КОУЧА
+            val user = (state as? EditProfileState.Success)?.user
+            if (user?.role == "coach") {
+                Spacer(modifier = Modifier.height(24.dp))
+                EditHeader("ПРОФЕСІЙНІ ДАНІ")
+                EditCard {
+                    EditInputField(value = specialization, onValueChange = { specialization = it }, label = "Спеціалізація", icon = Icons.Default.Work)
+                    HorizontalDivider(color = Color.White.copy(0.05f))
+                    EditInputField(value = experience, onValueChange = { experience = it }, label = "Досвід", icon = Icons.Default.Timeline)
+                    HorizontalDivider(color = Color.White.copy(0.05f))
+                    EditInputField(value = price, onValueChange = { price = it }, label = "Ціна", icon = Icons.Default.Payments)
                 }
             }
+
+            Spacer(modifier = Modifier.height(40.dp))
+            Button(
+                onClick = { viewModel.saveProfile(name, bio, specialization, experience, price) },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+            ) { Text("Зберегти зміни", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
         }
     }
+}
+
+@Composable
+fun EditHeader(title: String) {
+    Text(title, color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(start = 8.dp, bottom = 8.dp))
+}
+
+@Composable
+fun EditCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().background(SurfaceDarkElevated, RoundedCornerShape(20.dp)).padding(8.dp), content = content)
+}
+
+@Composable
+fun EditInputField(value: String, onValueChange: (String) -> Unit, label: String, icon: ImageVector) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = TextGray) },
+        leadingIcon = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = PrimaryBlue,
+                modifier = Modifier.size(20.dp)
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Color.Transparent,
+            unfocusedBorderColor = Color.Transparent,
+            focusedTextColor = TextWhite,
+            unfocusedTextColor = TextWhite
+        ),
+        singleLine = true
+    )
 }

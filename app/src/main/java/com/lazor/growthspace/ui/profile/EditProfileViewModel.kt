@@ -33,7 +33,8 @@ class EditProfileViewModel(
     private fun loadUser() {
         viewModelScope.launch {
             try {
-                val userId = authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
+                val userId =
+                    authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
                 val doc = firestore.collection("users").document(userId).get().await()
 
                 val user = doc.toObject(User::class.java) ?: User(
@@ -50,17 +51,26 @@ class EditProfileViewModel(
         }
     }
 
-    // Тепер приймаємо два параметри
-    fun saveProfile(newName: String, newBio: String) {
+    fun saveProfile(
+        newName: String,
+        newBio: String,
+        newSpec: String = "", // Додаємо цей параметр
+        newExp: String = "",  // І цей
+        newPrice: String = "" // І цей
+    ) {
         viewModelScope.launch {
             _state.value = EditProfileState.Loading
             try {
-                val userId = authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
+                val userId =
+                    authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
 
-                // Оновлюємо декілька полів одночасно
+                // Оновлюємо ВСІ поля в базі
                 val updates = hashMapOf<String, Any>(
                     "name" to newName,
-                    "bio" to newBio
+                    "bio" to newBio,
+                    "specialization" to newSpec,
+                    "experience" to newExp,
+                    "price" to newPrice
                 )
 
                 firestore.collection("users").document(userId)

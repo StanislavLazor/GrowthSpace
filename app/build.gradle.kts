@@ -68,4 +68,5 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     // Koin для Compose
     implementation("io.insert-koin:koin-androidx-compose:3.5.3")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }
