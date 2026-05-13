@@ -26,12 +26,12 @@ import java.time.LocalDate
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingStatusScreen(
-    coachId: Int,
+    coachId: String,
     date: String,
     time: String,
     onGoToSessions: () -> Unit
 ) {
-    val coach = dummyCoaches.find { it.id == coachId } ?: dummyCoaches.first()
+    val coach = dummyCoaches.find { it.id.toString() == coachId } ?: dummyCoaches.first()
 
     // Парсимо дату для відображення числа та місяця
     val localDate = try { LocalDate.parse(date) } catch(e: Exception) { LocalDate.now() }

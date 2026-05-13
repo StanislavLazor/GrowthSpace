@@ -29,14 +29,14 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingConfirmScreen(
-    coachId: Int,
+    coachId: String,
     selectedDate: String,
     selectedTime: String,
     onBackClick: () -> Unit,
     onSuccess: () -> Unit
 ) {
     // Знаходимо коуча за ID, щоб підтягнути його ім'я та ціну
-    val coach = dummyCoaches.find { it.id == coachId } ?: dummyCoaches.first()
+    val coach = dummyCoaches.find { it.id.toString() == coachId } ?: dummyCoaches.first()
     val scope = rememberCoroutineScope()
 
     // Стейт для текстового поля з нотаткою
