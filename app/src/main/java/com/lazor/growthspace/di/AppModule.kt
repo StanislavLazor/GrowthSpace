@@ -10,6 +10,7 @@ import com.lazor.growthspace.ui.home.HomeViewModel
 import com.lazor.growthspace.ui.profile.EditProfileViewModel
 import com.lazor.growthspace.ui.profile.ProfileViewModel
 import com.lazor.growthspace.ui.progress.ProgressViewModel
+import com.lazor.growthspace.ui.session.SessionsViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
@@ -29,4 +30,5 @@ val appModule = module {
     viewModel { HomeViewModel(get()) }
     viewModel { CoachViewModel(get()) }
     viewModel { ProgressViewModel(get(), get()) }
+    viewModel { SessionsViewModel(get(), get()) }
 }

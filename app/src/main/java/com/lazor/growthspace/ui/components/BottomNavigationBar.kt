@@ -31,21 +31,28 @@ fun BottomNavigationBar(navController: NavController) {
         val currentRoute = navBackStackEntry?.destination?.route
 
         items.forEach { item ->
+            // ПРАВИЛО ПІДСВІТКИ: підсвічуємо Home, навіть якщо ми всередині процесу бронювання
+            val isSelected = currentRoute == item.route ||
+                    (item.route == Routes.HOME && (
+                            currentRoute?.startsWith("coach_profile") == true ||
+                                    currentRoute?.startsWith("booking") == true
+                            ))
+
             NavigationBarItem(
                 icon = { Icon(item.icon, contentDescription = item.title) },
                 label = { Text(text = item.title, style = MaterialTheme.typography.labelSmall) },
-                selected = currentRoute == item.route ||
-                        (item.route == Routes.HOME && currentRoute?.startsWith("coach_profile") == true),
+                selected = isSelected,
                 onClick = {
-                    navController.navigate(item.route) {
-                        // Очищаємо стек до головного екрана, але ЗБЕРІГАЄМО стан
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+                    if (currentRoute != item.route) {
+                        navController.navigate(item.route) {
+                            // Очищаємо стек до стартової точки
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = item.route != Routes.HOME
+                            }
+                            launchSingleTop = true
+                            // Відновлюємо стан тільки для вкладок, які не є HOME
+                            restoreState = item.route != Routes.HOME
                         }
-                        // Уникаємо створення копій одного й того ж екрана
-                        launchSingleTop = true
-                        // ВІДНОВЛЮЄМО стан (наприклад, позицію скролу), якщо ми сюди повертаємось
-                        restoreState = true
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
