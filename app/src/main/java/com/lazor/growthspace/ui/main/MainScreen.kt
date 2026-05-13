@@ -35,16 +35,21 @@ fun MainScreen(onLogout: () -> Unit,
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Визначаємо, чи потрібно ховати нижнє меню (якщо ми на екрані дати АБО підтвердження)
-    val isBookingFlow = currentRoute?.startsWith("booking_date") == true ||
-            currentRoute?.startsWith("booking_time") == true ||
-            currentRoute?.startsWith("booking_confirmation") == true ||
-            currentRoute?.startsWith("booking_status") == true
+    // СПИСОК МАРШРУТІВ, ДЕ МЕНЮ МАЄ БУТИ ВИДИМИМ
+    val bottomNavRoutes = listOf(
+        Routes.HOME,
+        "sessions",
+        "chat",
+        "progress",
+        "profile"
+    )
+
+    // Показуємо меню, тільки якщо поточний маршрут є у списку головних вкладок
+    val showBottomBar = currentRoute in bottomNavRoutes
 
     Scaffold(
         bottomBar = {
-            // ХОВАЄМО МЕНЮ, ЯКЩО МИ В ПРОЦЕСІ БРОНЮВАННЯ
-            if (!isBookingFlow) {
+            if (showBottomBar) {
                 BottomNavigationBar(navController = navController)
             }
         }
@@ -62,9 +67,9 @@ fun MainScreen(onLogout: () -> Unit,
             // ПРОФІЛЬ КОУЧА
             composable(
                 route = Routes.COACH_PROFILE,
-                arguments = listOf(navArgument("id") { type = NavType.IntType })
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
             ) { backStackEntry ->
-                val coachId = backStackEntry.arguments?.getInt("id") ?: 1
+                val coachId = backStackEntry.arguments?.getString("id") ?: ""
                 CoachProfileScreen(
                     coachId = coachId,
                     onBackClick = { navController.popBackStack() },
@@ -78,9 +83,9 @@ fun MainScreen(onLogout: () -> Unit,
             // ЕКРАН ВИБОРУ ДАТИ (КАЛЕНДАР)
             composable(
                 route = Routes.BOOKING_DATE,
-                arguments = listOf(navArgument("id") { type = NavType.IntType })
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
             ) { backStackEntry ->
-                val coachId = backStackEntry.arguments?.getInt("id") ?: 1
+                val coachId = backStackEntry.arguments?.getString("id") ?: ""
                 BookingDateScreen(
                     coachId = coachId,
                     onBackClick = { navController.popBackStack() },
@@ -95,33 +100,33 @@ fun MainScreen(onLogout: () -> Unit,
             composable(
                 route = Routes.BOOKING_TIME,
                 arguments = listOf(
-                    navArgument("id") { type = NavType.IntType },
+                    navArgument("id") { type = NavType.StringType },
                     navArgument("date") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                val coachId = backStackEntry.arguments?.getInt("id") ?: 1
+                val coachId = backStackEntry.arguments?.getString("id") ?: ""
                 val date = backStackEntry.arguments?.getString("date") ?: ""
 
-                        BookingTimeScreen(
-                            coachId = coachId,
-                            selectedDate = date,
-                            onBackClick = { navController.popBackStack() },
-                            onChangeDateClick = { navController.popBackStack() }, // Повертає на календар
-                            onConfirmClick = { selectedTime ->
-                                navController.navigate("booking_confirmation/$coachId/$date/$selectedTime")
-                            }
-                        )
+                BookingTimeScreen(
+                    coachId = coachId,
+                    selectedDate = date,
+                    onBackClick = { navController.popBackStack() },
+                    onChangeDateClick = { navController.popBackStack() },
+                    onConfirmClick = { selectedTime ->
+                        navController.navigate("booking_confirmation/$coachId/$date/$selectedTime")
+                    }
+                )
             }
 
             composable(
                 route = Routes.BOOKING_CONFIRMATION,
                 arguments = listOf(
-                    navArgument("id") { type = NavType.IntType },
+                    navArgument("id") { type = NavType.StringType },
                     navArgument("date") { type = NavType.StringType },
                     navArgument("time") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                val coachId = backStackEntry.arguments?.getInt("id") ?: 1
+                val coachId = backStackEntry.arguments?.getString("id") ?: ""
                 val date = backStackEntry.arguments?.getString("date") ?: ""
                 val time = backStackEntry.arguments?.getString("time") ?: ""
 
@@ -142,12 +147,12 @@ fun MainScreen(onLogout: () -> Unit,
             composable(
                 route = Routes.BOOKING_STATUS,
                 arguments = listOf(
-                    navArgument("id") { type = NavType.IntType },
+                    navArgument("id") { type = NavType.StringType },
                     navArgument("date") { type = NavType.StringType },
                     navArgument("time") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                val coachId = backStackEntry.arguments?.getInt("id") ?: 1
+                val coachId = backStackEntry.arguments?.getString("id") ?: ""
                 val date = backStackEntry.arguments?.getString("date") ?: ""
                 val time = backStackEntry.arguments?.getString("time") ?: ""
 
@@ -183,12 +188,12 @@ fun MainScreen(onLogout: () -> Unit,
             ) { backStackEntry ->
                 val coachName = backStackEntry.arguments?.getString("coachName") ?: "Коуч"
 
-                // Визначаємо ID коуча на основі його імені
+                // Тимчасова заглушка для ID з чату (теж переведено в String)
                 val coachId = when {
-                    coachName.contains("Олександр") -> 1
-                    coachName.contains("Олена") -> 2
-                    coachName.contains("Дмитро") -> 3
-                    else -> 1
+                    coachName.contains("Олександр") -> "1"
+                    coachName.contains("Олена") -> "2"
+                    coachName.contains("Дмитро") -> "3"
+                    else -> "1"
                 }
 
                 com.lazor.growthspace.ui.chat.ChatScreen(
@@ -215,7 +220,6 @@ fun MainScreen(onLogout: () -> Unit,
                 EditProfileScreen(
                     onBackClick = { navController.popBackStack() },
                     onSaveClick = {
-                        // Поки просто повертаємось назад
                         navController.popBackStack()
                     }
                 )

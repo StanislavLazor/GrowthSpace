@@ -1,355 +1,256 @@
 package com.lazor.growthspace.ui.coach
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lazor.growthspace.data.model.dummyCoaches
 import com.lazor.growthspace.ui.theme.*
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun CoachProfileScreen(
-    coachId: Int,
+    coachId: String,
     onBackClick: () -> Unit,
-    onBookSessionClick: () -> Unit
+    onBookSessionClick: () -> Unit,
+    viewModel: CoachViewModel = koinViewModel()
 ) {
-    val coach = dummyCoaches.find { it.id == coachId } ?: dummyCoaches.first()
+    val coach by viewModel.coach.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Про себе", "Відгуки (${coach.reviews.size})")
-
-    // Стейт для розгортання тексту біографії
-    var isBioExpanded by remember { mutableStateOf(false) }
+    // Завантажуємо дані через ViewModel
+    LaunchedEffect(coachId) {
+        viewModel.loadCoachData(coachId)
+    }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
         containerColor = BackgroundDark,
         bottomBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundDark)
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            // Нижня панель з кнопкою (як на макеті)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = BackgroundDark,
+                shadowElevation = 12.dp
             ) {
                 Button(
                     onClick = onBookSessionClick,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                     shape = RoundedCornerShape(28.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "Забронювати сесію", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = TextWhite, modifier = Modifier.size(18.dp))
-                    }
+                    Text("Забронювати сесію", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                 }
             }
         }
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 80.dp, bottom = 16.dp)
+    ) { paddingValues ->
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryBlue)
+            }
+        } else if (coach != null) {
+            val user = coach!!
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
             ) {
-                // Блок 1: Фото та основна інфо
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                // 1. HEADER (Photo & Buttons)
+                Box(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+                    // Заглушка для фото (можна додати Coil Image пізніше)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(SurfaceDarkElevated),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier.size(140.dp).background(SurfaceDark, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = coach.name.take(1), fontSize = 64.sp, color = TextGray)
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(text = coach.name, color = TextWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = coach.specialization, color = TextGray, fontSize = 16.sp, textAlign = TextAlign.Center)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 20.dp)
-                        ) {
-                            items(coach.tags) { tag ->
-                                Box(
-                                    modifier = Modifier.background(SurfaceDarkElevated, RoundedCornerShape(20.dp)).padding(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Text(text = tag, color = PrimaryBlue, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                }
-                            }
-                        }
+                        Text(
+                            text = user.name.firstOrNull()?.toString() ?: "",
+                            fontSize = 80.sp,
+                            color = TextGray.copy(alpha = 0.5f),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
 
-                // Блок 2: Картки статистики
-                item {
+                    // Кнопки навігації поверх фото
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        StatCard(value = "${coach.totalSessions}+", label = "Сесій", modifier = Modifier.weight(1f))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        StatCard(value = coach.rating.toString(), label = "Рейтинг", icon = Icons.Default.Star, modifier = Modifier.weight(1f))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        StatCard(value = coach.yearsExp.toString(), label = "Років досвіду", modifier = Modifier.weight(1f))
-                    }
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
-
-                // Блок 3: Таби
-                item {
-                    TabRow(
-                        selectedTabIndex = selectedTabIndex,
-                        containerColor = BackgroundDark,
-                        contentColor = PrimaryBlue,
-                        indicator = { tabPositions ->
-                            TabRowDefaults.SecondaryIndicator(modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]), color = PrimaryBlue)
-                        },
-                        divider = { HorizontalDivider(color = SurfaceDark) },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
-                    ) {
-                        tabs.forEachIndexed { index, title ->
-                            Tab(
-                                selected = selectedTabIndex == index,
-                                onClick = { selectedTabIndex = index },
-                                text = { Text(text = title, fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal) },
-                                selectedContentColor = PrimaryBlue,
-                                unselectedContentColor = TextGray
-                            )
+                        IconButton(
+                            onClick = onBackClick,
+                            modifier = Modifier.background(Color.Black.copy(0.3f), CircleShape)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
                         }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-
-                // Блок 4: Контент вкладок
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                        if (selectedTabIndex == 0) {
-                            // КОНТЕНТ: Про себе
-                            Text(text = "Про мене", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Текст, який розгортається з анімацією
-                            Column(modifier = Modifier.animateContentSize()) {
-                                Text(
-                                    text = coach.fullBio,
-                                    color = TextGray,
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp,
-                                    maxLines = if (isBioExpanded) Int.MAX_VALUE else 3,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = if (isBioExpanded) "Згорнути" else "Читати повністю",
-                                    color = PrimaryBlue,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.clickable { isBioExpanded = !isBioExpanded } // Обробка кліку
-                                )
+                        Row {
+                            IconButton(onClick = {}, modifier = Modifier.background(Color.Black.copy(0.3f), CircleShape)) {
+                                Icon(Icons.Default.Share, "Share", tint = Color.White)
                             }
-
-                            Spacer(modifier = Modifier.height(32.dp))
-
-                            Text(text = "Спеціалізація", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            coach.specializationPoints.forEach { point ->
-                                ChecklistItem(text = point)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(onClick = {}, modifier = Modifier.background(Color.Black.copy(0.3f), CircleShape)) {
+                                Icon(Icons.Default.FavoriteBorder, "Fav", tint = Color.White)
                             }
-
-                            Spacer(modifier = Modifier.height(32.dp))
-
-                            Spacer(modifier = Modifier.height(32.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth().background(SurfaceDarkElevated, shape = RoundedCornerShape(16.dp)).padding(20.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(imageVector = Icons.Default.AccessTime, contentDescription = null, tint = TextGray, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(text = "Тривалість сесії", color = TextGray, fontSize = 12.sp)
-                                        Text(text = "60 хвилин", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(text = "Вартість", color = TextGray, fontSize = 12.sp)
-                                    Text(text = "$${coach.price}", color = PrimaryBlue, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                        } else {
-                            // КОНТЕНТ: Відгуки
-                            if (coach.reviews.isEmpty()) {
-                                Text(
-                                    text = "Поки що немає відгуків...",
-                                    color = TextGray,
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                                    textAlign = TextAlign.Center
-                                )
-                            } else {
-                                // Перебираємо всі відгуки поточного коуча
-                                coach.reviews.forEach { review ->
-                                    ReviewCard(
-                                        name = review.authorName,
-                                        date = review.date,
-                                        rating = review.rating,
-                                        reviewText = review.text
-                                    )
-                                    Spacer(modifier = Modifier.height(24.dp))
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(80.dp)) // Відступ для нижньої кнопки
                         }
                     }
                 }
-            }
 
-            HeaderButtons(onBackClick = onBackClick)
-        }
-    }
-}
-
-// НОВИЙ КОМПОНЕНТ: Картка відгуку
-@Composable
-fun ReviewCard(name: String, date: String, rating: Double, reviewText: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(SurfaceDarkElevated, RoundedCornerShape(20.dp)) // Трохи кругліші кути
-            .padding(20.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = name.take(1), color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Ім'я та Спеціалізація
+                    Text(text = user.name, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                    Text(
+                        text = user.specialization.ifBlank { "Професійний коуч" },
+                        fontSize = 16.sp,
+                        color = TextGray
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // 2. STATS ROW
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceDarkElevated, RoundedCornerShape(24.dp))
+                            .padding(20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CoachStatItem("120+", "Сесій")
+                        VerticalDivider(color = Color.White.copy(0.1f), modifier = Modifier.height(30.dp))
+                        CoachStatItem("4.9 ★", "Рейтинг")
+                        VerticalDivider(color = Color.White.copy(0.1f), modifier = Modifier.height(30.dp))
+                        CoachStatItem(user.experience.ifBlank { "0" }, "Досвід")
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // 3. TABS (UI заглушка як на фото)
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text("Про себе", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(PrimaryBlue))
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text("Відгуки (43)", color = TextGray)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.Gray.copy(0.2f)))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // 4. ПРО МЕНЕ
+                    Text(
+                        text = "Про мене",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextWhite,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = user.bio.ifBlank { "Цей коуч ще не заповнив інформацію про себе." },
+                        color = TextGray,
+                        lineHeight = 22.sp,
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // 5. СПЕЦІАЛІЗАЦІЯ (Перелік)
+                    Text(
+                        text = "Спеціалізація",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextWhite,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    user.specialization.split(",").forEach { item ->
+                        if (item.isNotBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.CheckCircle, null, tint = PrimaryBlue.copy(0.7f), modifier = Modifier.size(22.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(item.trim(), color = TextWhite, fontSize = 15.sp)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // 6. PRICE CARD
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceDarkElevated, RoundedCornerShape(24.dp))
+                            .padding(20.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AccessTime, null, tint = TextGray, modifier = Modifier.size(28.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Тривалість сесії", color = TextGray, fontSize = 13.sp)
+                                Text("60 хвилин", color = TextWhite, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Вартість", color = TextGray, fontSize = 13.sp)
+                                Text(
+                                    text = if (user.price.contains("грн") || user.price.contains("$")) user.price else "${user.price} грн",
+                                    color = PrimaryBlue,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(40.dp))
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(text = name, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(text = date, color = TextGray, fontSize = 12.sp)
-                }
-            }
-            // Плашка з рейтингом
-            Row(
-                modifier = Modifier
-                    .border(1.dp, SurfaceDark, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = rating.toString(), color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(Icons.Default.Star, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = reviewText, color = TextGray, fontSize = 15.sp, lineHeight = 22.sp)
-    }
-}
-
-// Компонент картки статистики
-@Composable
-fun StatCard(value: String, label: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    Column(
-        modifier = modifier.border(width = 1.dp, color = SurfaceDark, shape = RoundedCornerShape(16.dp)).padding(vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = value, color = TextWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            if (icon != null) {
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(imageVector = icon, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = label, color = TextGray, fontSize = 12.sp)
     }
 }
 
 @Composable
-fun ChecklistItem(text: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(text = text, color = TextGray, fontSize = 14.sp)
+fun CoachStatItem(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+        Text(label, fontSize = 12.sp, color = TextGray)
     }
-}
-
-@Composable
-fun HeaderButtons(onBackClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        HeaderIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = onBackClick)
-        Row {
-            HeaderIconButton(icon = Icons.Default.IosShare, onClick = { })
-            Spacer(modifier = Modifier.width(16.dp))
-            HeaderIconButton(icon = Icons.Default.FavoriteBorder, onClick = { })
-        }
-    }
-}
-
-@Composable
-fun HeaderIconButton(icon: ImageVector, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.size(40.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape).clip(CircleShape).clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(imageVector = icon, contentDescription = null, tint = TextWhite, modifier = Modifier.size(20.dp))
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun CoachProfileScreenPreview() {
-    CoachProfileScreen(coachId = 1, onBackClick = {}, onBookSessionClick = {})
 }
