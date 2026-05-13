@@ -1,19 +1,21 @@
 package com.lazor.growthspace.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,66 +39,155 @@ fun HomeScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
+    // Список категорій для чипсів
+    val categories = listOf("Усі", "Бізнес", "Life-coach", "Психологія")
+    var selectedCategory by remember { mutableStateOf("Усі") }
+
     Scaffold(
         containerColor = BackgroundDark,
-        topBar = {
-            TopAppBar(
-                title = { Text("Знайди коуча", color = TextWhite, fontSize = 28.sp, fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
-        }
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            // 1. Пошук
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = viewModel::onSearchQueryChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    placeholder = { Text("Пошук коучів, тем...", color = TextGray) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = TextGray) },
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = SurfaceDarkElevated,
+                        unfocusedContainerColor = SurfaceDarkElevated,
+                        focusedBorderColor = PrimaryBlue,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = TextWhite,
+                        unfocusedTextColor = TextWhite
+                    ),
+                    singleLine = true
+                )
+            }
 
-            // Пошуковий рядок
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = viewModel::onSearchQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Пошук за ім'ям...", color = TextGray) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = TextGray) },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = SurfaceDarkElevated,
-                    unfocusedContainerColor = SurfaceDarkElevated,
-                    focusedBorderColor = PrimaryBlue,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = TextWhite,
-                    unfocusedTextColor = TextWhite
-                ),
-                singleLine = true
-            )
+            // 2. Категорії (Чипси)
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    items(categories) { category ->
+                        val isSelected = category == selectedCategory
+                        Surface(
+                            modifier = Modifier.clickable { selectedCategory = category },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) PrimaryBlue else SurfaceDarkElevated,
+                            border = if (!isSelected) BorderStroke(1.dp, Color.White.copy(0.1f)) else null
+                        ) {
+                            Text(
+                                text = category,
+                                color = TextWhite,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // 3. Рекомендовані (Горизонтальний список)
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Рекомендовані", color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text("Всі", color = PrimaryBlue, fontSize = 14.sp)
+                }
+
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Беремо перших 3 для блоку рекомендованих
+                    items(coaches.take(3)) { coach ->
+                        RecommendedCoachCard(coach) {
+                            navController.navigate("coach_profile/${coach.id}")
+                        }
+                    }
+                }
+            }
+
+            // 4. Всі спеціалісти
+            item {
+                Text(
+                    "Всі спеціалісти",
+                    color = TextWhite,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                )
+            }
 
             if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = PrimaryBlue)
-                }
-            } else if (coaches.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Коучів не знайдено", color = TextGray, fontSize = 16.sp)
-                }
+                item { Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = PrimaryBlue) } }
             } else {
-                // Список коучів
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 20.dp)
-                ) {
-                    items(coaches) { coach ->
-                        CoachCard(
-                            coach = coach,
-                            onClick = {
-                                navController.navigate("coach_profile/${coach.id}")
-                            }
-                        )
+                items(coaches) { coach ->
+                    CoachListCard(coach) {
+                        navController.navigate("coach_profile/${coach.id}")
                     }
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+        }
+    }
+}
+
+// --- КОМПОНЕНТИ КАРТОК ---
+
+@Composable
+fun RecommendedCoachCard(coach: User, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .width(220.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDarkElevated)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Box {
+                // Заглушка фото
+                Box(modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(16.dp)).background(SurfaceDark)) {
+                    Text(coach.name.take(1), Modifier.align(Alignment.Center), color = TextGray, fontSize = 40.sp)
+                }
+                // Рейтинг поверх фото
+                Surface(
+                    modifier = Modifier.padding(8.dp).align(Alignment.TopEnd),
+                    color = Color.Black.copy(0.6f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Star, null, tint = Color(0xFFFFC107), modifier = Modifier.size(12.dp))
+                        Text(" 4.9", color = TextWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(coach.name, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
+            Text(coach.specialization, color = PrimaryBlue, fontSize = 13.sp, maxLines = 1)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Від ${coach.price}", color = TextGray, fontSize = 12.sp)
+                Box(Modifier.size(32.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.ArrowForward, null, tint = TextWhite, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -104,49 +195,42 @@ fun HomeScreen(
 }
 
 @Composable
-fun CoachCard(coach: User, onClick: () -> Unit) {
-    val firstLetter = coach.name.firstOrNull()?.uppercase() ?: "C"
-
-    Row(
+fun CoachListCard(coach: User, onClick: () -> Unit) {
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .background(SurfaceDarkElevated, RoundedCornerShape(20.dp))
-            .clip(RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        color = SurfaceDarkElevated
     ) {
-        // Аватарка
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .background(PrimaryBlue.copy(alpha = 0.2f), CircleShape)
-                .border(1.dp, PrimaryBlue, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = firstLetter, color = PrimaryBlue, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        }
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Аватарка
+            Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(SurfaceDark)) {
+                Text(coach.name.take(1), Modifier.align(Alignment.Center), color = TextGray, fontSize = 24.sp)
+            }
 
-        Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-        // Інформація
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = coach.name,
-                color = TextWhite,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (coach.bio.isNotBlank()) coach.bio else "Досвідчений фахівець",
-                color = TextGray,
-                fontSize = 14.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(coach.name, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.Star, null, tint = Color(0xFFFFC107), modifier = Modifier.size(14.dp))
+                    Text(" 4.8", color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                Text(coach.specialization, color = TextGray, fontSize = 13.sp, maxLines = 1)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Тег категорії
+                    Surface(color = SurfaceDark, shape = RoundedCornerShape(8.dp)) {
+                        Text("Кар'єра", color = TextGray, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 11.sp)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(coach.price, color = PrimaryBlue, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
         }
     }
 }

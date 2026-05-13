@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-// Стан залишаємо без змін
 sealed class ProfileState {
     object Loading : ProfileState()
     data class Success(val user: User) : ProfileState()
@@ -24,7 +23,6 @@ class ProfileViewModel(
     private val _profileState = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val profileState: StateFlow<ProfileState> = _profileState.asStateFlow()
 
-    // Змінна для збереження нашого "слухача"
     private var listenerRegistration: ListenerRegistration? = null
 
     init {
@@ -34,31 +32,19 @@ class ProfileViewModel(
     private fun startListeningToProfile() {
         val userId = authRepository.getCurrentUserId()
         if (userId != null) {
-            _profileState.value = ProfileState.Loading
-
-            // Замість одноразового get() використовуємо SnapshotListener
             listenerRegistration = firestore.collection("users").document(userId)
                 .addSnapshotListener { document, error ->
                     if (error != null) {
                         _profileState.value = ProfileState.Error(error.message ?: "Помилка")
                         return@addSnapshotListener
                     }
-
                     if (document != null && document.exists()) {
-                        val user = document.toObject(User::class.java) ?: User(
-                            id = userId,
-                            name = document.getString("name") ?: "Користувач",
-                            email = document.getString("email") ?: "",
-                            role = document.getString("role") ?: "client",
-                            bio = document.getString("bio") ?: ""
-                        )
-                        _profileState.value = ProfileState.Success(user)
-                    } else {
-                        _profileState.value = ProfileState.Error("Користувача не знайдено")
+                        val user = document.toObject(User::class.java)
+                        if (user != null) {
+                            _profileState.value = ProfileState.Success(user)
+                        }
                     }
                 }
-        } else {
-            _profileState.value = ProfileState.Error("Користувача не знайдено")
         }
     }
 
