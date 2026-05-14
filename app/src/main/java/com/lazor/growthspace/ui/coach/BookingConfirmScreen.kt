@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.lazor.growthspace.data.model.dummyCoaches
+import com.lazor.growthspace.ui.components.UserAvatar // ДОДАНО ІМПОРТ
 import com.lazor.growthspace.ui.theme.*
 import com.lazor.growthspace.ui.session.SessionsViewModel
 import kotlinx.coroutines.tasks.await
@@ -41,7 +42,7 @@ fun BookingConfirmScreen(
     var coachName by remember { mutableStateOf("Завантаження...") }
     var coachSpec by remember { mutableStateOf("") }
     var coachPrice by remember { mutableStateOf(1250) }
-    var coachInitial by remember { mutableStateOf("?") }
+    var coachPhotoUrl by remember { mutableStateOf("") } // НОВИЙ СТЕЙТ
 
     // Завантажуємо реальні дані перед збереженням
     LaunchedEffect(coachId) {
@@ -52,13 +53,13 @@ fun BookingConfirmScreen(
                 coachName = doc.getString("name") ?: "Коуч"
                 coachSpec = doc.getString("specialization") ?: "Спеціаліст"
                 coachPrice = (doc.getString("price")?.toIntOrNull() ?: 50) * 25
-                coachInitial = coachName.take(1).uppercase()
+                coachPhotoUrl = doc.getString("photoUrl") ?: "" // ВИТЯГУЄМО ФОТО
             } else {
                 val d = dummyCoaches.find { it.id.toString() == coachId } ?: dummyCoaches.first()
                 coachName = d.name
                 coachSpec = d.specialization
                 coachPrice = d.price * 25
-                coachInitial = d.name.take(1).uppercase()
+                coachPhotoUrl = d.photoUrl // ВИТЯГУЄМО ФОТО
             }
         } catch (e: Exception) {}
     }
@@ -81,10 +82,17 @@ fun BookingConfirmScreen(
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp)) {
             // Картка коуча
             Row(modifier = Modifier.fillMaxWidth().background(SurfaceDarkElevated, RoundedCornerShape(24.dp)).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(60.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                    Text(coachInitial, color = TextWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
+                // КОМБІНАЦІЯ АВАТАРА ТА ЗЕЛЕНОЇ КРАПКИ
+                Box(modifier = Modifier.size(60.dp)) {
+                    UserAvatar(
+                        photoUrl = coachPhotoUrl,
+                        name = coachName,
+                        modifier = Modifier.fillMaxSize()
+                    )
                     Box(modifier = Modifier.size(14.dp).background(Color(0xFF00E676), CircleShape).border(2.dp, SurfaceDarkElevated, CircleShape).align(Alignment.BottomEnd))
                 }
+
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(coachName, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -125,7 +133,7 @@ fun BookingConfirmScreen(
                     isLoading = true
                     viewModel.requestSessionAsClient(
                         coachId = coachId,
-                        coachName = coachName, // ПЕРЕДАЄМО РЕАЛЬНЕ ІМ'Я!
+                        coachName = coachName,
                         date = selectedDate,
                         time = selectedTime,
                         onComplete = {

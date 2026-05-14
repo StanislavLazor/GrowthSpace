@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.lazor.growthspace.data.model.User
+import com.lazor.growthspace.ui.components.UserAvatar
 import com.lazor.growthspace.ui.theme.*
 import org.koin.androidx.compose.koinViewModel
 
@@ -38,7 +39,7 @@ fun HomeScreen(
     val coaches by viewModel.coaches.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedCategory by viewModel.selectedCategory.collectAsState() // Підключено до VM
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
 
     val categories = listOf("Усі", "Бізнес", "Life-coach", "Психологія")
 
@@ -54,7 +55,7 @@ fun HomeScreen(
             item {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = viewModel::onSearchQueryChange, // Працює через VM
+                    onValueChange = viewModel::onSearchQueryChange,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 16.dp),
@@ -74,7 +75,7 @@ fun HomeScreen(
                 )
             }
 
-            // 2. Категорії (Чипси)
+            // 2. Категорії
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -84,7 +85,7 @@ fun HomeScreen(
                     items(categories) { category ->
                         val isSelected = category == selectedCategory
                         Surface(
-                            modifier = Modifier.clickable { viewModel.onCategorySelect(category) }, // Працює через VM
+                            modifier = Modifier.clickable { viewModel.onCategorySelect(category) },
                             shape = RoundedCornerShape(16.dp),
                             color = if (isSelected) PrimaryBlue else SurfaceDarkElevated,
                             border = if (!isSelected) BorderStroke(1.dp, Color.White.copy(0.1f)) else null
@@ -101,7 +102,7 @@ fun HomeScreen(
                 }
             }
 
-            // 3. Рекомендовані (Ховаємо, якщо активний пошук)
+            // 3. Рекомендовані
             if (searchQuery.isBlank() && selectedCategory == "Усі" && !isLoading) {
                 item {
                     Row(
@@ -126,7 +127,7 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Всі спеціалісти (або результати пошуку)
+            // 4. Всі спеціалісти
             item {
                 val listTitle = if (searchQuery.isNotBlank() || selectedCategory != "Усі") "Результати пошуку" else "Всі спеціалісти"
                 Text(
@@ -159,9 +160,6 @@ fun HomeScreen(
     }
 }
 
-// --- КОМПОНЕНТИ КАРТОК ---
-// (Твої карточки залишилися без змін, просто скопіюй їх)
-
 @Composable
 fun RecommendedCoachCard(coach: User, onClick: () -> Unit) {
     Card(
@@ -173,9 +171,12 @@ fun RecommendedCoachCard(coach: User, onClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Box {
-                Box(modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(16.dp)).background(SurfaceDark)) {
-                    Text(coach.name.take(1), Modifier.align(Alignment.Center), color = TextGray, fontSize = 40.sp)
-                }
+                UserAvatar(
+                    photoUrl = coach.photoUrl,
+                    name = coach.name,
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    shape = RoundedCornerShape(16.dp)
+                )
                 Surface(
                     modifier = Modifier.padding(8.dp).align(Alignment.TopEnd),
                     color = Color.Black.copy(0.6f),
@@ -212,9 +213,12 @@ fun CoachListCard(coach: User, onClick: () -> Unit) {
         color = SurfaceDarkElevated
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(SurfaceDark)) {
-                Text(coach.name.take(1), Modifier.align(Alignment.Center), color = TextGray, fontSize = 24.sp)
-            }
+            UserAvatar(
+                photoUrl = coach.photoUrl,
+                name = coach.name,
+                modifier = Modifier.size(80.dp),
+                shape = RoundedCornerShape(16.dp)
+            )
 
             Spacer(modifier = Modifier.width(16.dp))
 
