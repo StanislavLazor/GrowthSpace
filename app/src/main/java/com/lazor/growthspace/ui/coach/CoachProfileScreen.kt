@@ -300,7 +300,6 @@ fun ReviewItem(
                 Text("${review.rating} ★", color = PrimaryBlue, fontSize = 12.sp)
             }
 
-            // Якщо це наш відгук — показуємо іконку видалення
             if (isOwnReview) {
                 IconButton(
                     onClick = onDeleteClick,
@@ -309,7 +308,7 @@ fun ReviewItem(
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Видалити відгук",
-                        tint = Color(0xFFFF5252) // Червоний колір смітника
+                        tint = Color(0xFFFF5252)
                     )
                 }
             }
