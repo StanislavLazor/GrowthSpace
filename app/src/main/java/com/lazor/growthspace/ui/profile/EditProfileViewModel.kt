@@ -14,7 +14,7 @@ import kotlinx.coroutines.tasks.await
 sealed class EditProfileState {
     object Loading : EditProfileState()
     data class Success(val user: User) : EditProfileState()
-    object Saved : EditProfileState() // Стан для успішного збереження
+    object Saved : EditProfileState()
     data class Error(val message: String) : EditProfileState()
 }
 
@@ -33,8 +33,7 @@ class EditProfileViewModel(
     private fun loadUser() {
         viewModelScope.launch {
             try {
-                val userId =
-                    authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
+                val userId = authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
                 val doc = firestore.collection("users").document(userId).get().await()
 
                 val user = doc.toObject(User::class.java) ?: User(
@@ -42,7 +41,11 @@ class EditProfileViewModel(
                     name = doc.getString("name") ?: "",
                     email = doc.getString("email") ?: "",
                     role = doc.getString("role") ?: "client",
-                    bio = doc.getString("bio") ?: "" // Завантажуємо біо
+                    bio = doc.getString("bio") ?: "",
+                    specialization = doc.getString("specialization") ?: "",
+                    experience = doc.getString("experience") ?: "",
+                    price = doc.getString("price") ?: "",
+                    photoUrl = doc.getString("photoUrl") ?: ""
                 )
                 _state.value = EditProfileState.Success(user)
             } catch (e: Exception) {
@@ -54,29 +57,26 @@ class EditProfileViewModel(
     fun saveProfile(
         newName: String,
         newBio: String,
-        newSpec: String = "", // Додаємо цей параметр
-        newExp: String = "",  // І цей
-        newPrice: String = "" // І цей
+        newSpec: String = "",
+        newExp: String = "",
+        newPrice: String = "",
+        newPhotoUrl: String = "" // Тепер просто зберігаємо рядок з посиланням
     ) {
         viewModelScope.launch {
             _state.value = EditProfileState.Loading
             try {
-                val userId =
-                    authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
+                val userId = authRepository.getCurrentUserId() ?: throw Exception("User not logged in")
 
-                // Оновлюємо ВСІ поля в базі
                 val updates = hashMapOf<String, Any>(
                     "name" to newName,
                     "bio" to newBio,
                     "specialization" to newSpec,
                     "experience" to newExp,
-                    "price" to newPrice
+                    "price" to newPrice,
+                    "photoUrl" to newPhotoUrl
                 )
 
-                firestore.collection("users").document(userId)
-                    .update(updates)
-                    .await()
-
+                firestore.collection("users").document(userId).update(updates).await()
                 _state.value = EditProfileState.Saved
             } catch (e: Exception) {
                 _state.value = EditProfileState.Error(e.message ?: "Помилка збереження")

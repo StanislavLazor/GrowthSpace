@@ -16,11 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.data.model.Review
+import com.lazor.growthspace.ui.components.UserAvatar
 import com.lazor.growthspace.ui.theme.*
 import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
@@ -77,9 +79,12 @@ fun CoachProfileScreen(
             ) {
                 // HEADER Section
                 Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
-                    Box(modifier = Modifier.fillMaxSize().background(SurfaceDarkElevated), contentAlignment = Alignment.Center) {
-                        Text(user.name.firstOrNull()?.toString() ?: "", fontSize = 80.sp, color = TextGray.copy(0.3f), fontWeight = FontWeight.Bold)
-                    }
+                    UserAvatar(
+                        photoUrl = user.photoUrl,
+                        name = user.name,
+                        modifier = Modifier.fillMaxSize(),
+                        shape = RectangleShape
+                    )
                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         IconButton(onClick = onBackClick, modifier = Modifier.background(Color.Black.copy(0.3f), CircleShape)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
@@ -121,10 +126,10 @@ fun CoachProfileScreen(
                     } else {
                         ReviewsSection(
                             reviews = reviews,
-                            currentUserId = currentUser?.id, // Передаємо ID поточного юзера
+                            currentUserId = currentUser?.id,
                             canAddReview = currentUser?.role == "client" && currentUser?.id != coachId,
                             onAddReviewClick = { showReviewDialog = true },
-                            onDeleteReviewClick = { reviewId -> viewModel.deleteReview(reviewId) } // Прокидаємо видалення
+                            onDeleteReviewClick = { reviewId -> viewModel.deleteReview(reviewId) }
                         )
                     }
                     Spacer(modifier = Modifier.height(100.dp))
@@ -144,8 +149,7 @@ fun CoachProfileScreen(
     }
 }
 
-// --- ДОПОМІЖНІ КОМПОНЕНТИ ---
-
+// ДОПОМІЖНІ КОМПОНЕНТИ ПРОФІЛЮ ЗАЛИШИВ БЕЗ ЗМІН
 @Composable
 fun AddReviewDialog(
     onDismiss: () -> Unit,
@@ -260,7 +264,7 @@ fun ReviewsSection(
             reviews.forEach { review ->
                 ReviewItem(
                     review = review,
-                    isOwnReview = review.clientId == currentUserId, // Перевіряємо, чи це наш відгук
+                    isOwnReview = review.clientId == currentUserId,
                     onDeleteClick = { onDeleteReviewClick(review.id) }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -295,7 +299,7 @@ fun ReviewItem(
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) { // Забираємо весь доступний простір
+            Column(modifier = Modifier.weight(1f)) {
                 Text(review.clientName, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text("${review.rating} ★", color = PrimaryBlue, fontSize = 12.sp)
             }

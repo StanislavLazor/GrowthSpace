@@ -7,5 +7,6 @@ data class Review(
     val clientName: String = "",
     val rating: Int = 5,
     val text: String = "",
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val photoUrl: String = ""
 )

@@ -22,7 +22,8 @@ data class Coach(
     val yearsExp: Int,
     val fullBio: String,
     val specializationPoints: List<String>,
-    val reviews: List<DummyReview> // ВИПРАВЛЕНО
+    val reviews: List<DummyReview>,
+    val photoUrl: String = ""
 )
 
 val dummyCoaches = listOf(

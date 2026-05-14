@@ -12,5 +12,6 @@ data class SessionBooking(
     val status: String = "available", // available, pending, confirmed, cancelled, completed
     val createdAt: Long = System.currentTimeMillis(),
     val notes: String = "",         // Загальні нотатки (бачать обидва)
-    val privateNotes: String = ""   // Приватні нотатки (тільки для коуча)
+    val privateNotes: String = "",   // Приватні нотатки (тільки для коуча)
+    val photoUrl: String = ""
 )

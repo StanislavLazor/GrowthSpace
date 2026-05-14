@@ -1,10 +1,5 @@
 package com.lazor.growthspace.ui.profile
 
-import android.net.Uri
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -24,7 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -41,7 +35,6 @@ fun EditProfileScreen(
     viewModel: EditProfileViewModel = koinViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val context = LocalContext.current
 
     var name by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
@@ -49,12 +42,7 @@ fun EditProfileScreen(
     var experience by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var photoUrl by remember { mutableStateOf("") }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isDataLoaded by remember { mutableStateOf(false) }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri -> selectedImageUri = uri }
 
     LaunchedEffect(state) {
         if (state is EditProfileState.Success && !isDataLoaded) {
@@ -82,31 +70,64 @@ fun EditProfileScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // АВАТАРКА З ЛОГІКОЮ ВИБОРУ
-            Box(contentAlignment = Alignment.BottomEnd) {
-                Box(
-                    modifier = Modifier.size(110.dp).clip(CircleShape).background(SurfaceDarkElevated).border(2.dp, PrimaryBlue, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
+
+            // ЛОГІКА АВАТАРКИ З ІНІЦІАЛАМИ АБО ФОТО
+            val finalImageUrl = if (photoUrl.isNotBlank()) {
+                photoUrl // Якщо є посилання - показуємо його
+            } else if (name.isNotBlank()) {
+                // Якщо посилання немає, але є ім'я - генеруємо круті ініціали
+                "https://ui-avatars.com/api/?name=${name.replace(" ", "+")}&background=0D8ABC&color=fff&size=256"
+            } else {
+                "" // Якщо зовсім порожньо
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(110.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceDarkElevated)
+                    .border(2.dp, PrimaryBlue, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (finalImageUrl.isNotEmpty()) {
                     AsyncImage(
-                        model = selectedImageUri ?: photoUrl,
-                        contentDescription = null,
+                        model = finalImageUrl,
+                        contentDescription = "Аватар користувача",
                         modifier = Modifier.fillMaxSize().clip(CircleShape),
                         contentScale = ContentScale.Crop
                     )
+                } else {
+                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(50.dp), tint = TextGray)
                 }
-                SmallFloatingActionButton(
-                    onClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                    containerColor = PrimaryBlue,
-                    shape = CircleShape,
-                    modifier = Modifier.size(36.dp)
-                ) { Icon(Icons.Default.PhotoCamera, null, modifier = Modifier.size(18.dp), tint = Color.White) }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ІНСТРУКЦІЯ ТА ПОЛЕ ДЛЯ ФОТО
+            EditHeader("ФОТО ПРОФІЛЮ")
+            EditCard {
+                Text(
+                    text = "💡 Знайдіть фото в інтернеті, затисніть його і виберіть «Копіювати адресу зображення». Вставте посилання нижче.",
+                    color = TextGray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                EditInputField(
+                    value = photoUrl,
+                    onValueChange = { photoUrl = it },
+                    label = "Посилання на фото (URL)",
+                    icon = Icons.Default.Link
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // КАРТКА ОСНОВНИХ ДАНИХ
             EditHeader("ОСОБИСТІ ДАНІ")
@@ -114,7 +135,6 @@ fun EditProfileScreen(
                 EditInputField(value = name, onValueChange = { name = it }, label = "Ім'я", icon = Icons.Default.Person)
                 HorizontalDivider(color = Color.White.copy(0.05f))
 
-                // БІО З ПІДТРИМКОЮ ENTER
                 OutlinedTextField(
                     value = bio,
                     onValueChange = { bio = it },
@@ -147,11 +167,17 @@ fun EditProfileScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
             Button(
-                onClick = { viewModel.saveProfile(name, bio, specialization, experience, price) },
+                onClick = { viewModel.saveProfile(name, bio, specialization, experience, price, photoUrl) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-            ) { Text("Зберегти зміни", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+            ) {
+                if (state is EditProfileState.Loading) {
+                    CircularProgressIndicator(color = BackgroundDark, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Зберегти зміни", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
         }
     }
 }
