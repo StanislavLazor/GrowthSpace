@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.lazor.growthspace.data.model.dummyCoaches
+import com.lazor.growthspace.ui.components.UserAvatar // ДОДАНО ІМПОРТ
 import com.lazor.growthspace.ui.theme.*
 import com.lazor.growthspace.ui.session.SessionsViewModel
 import kotlinx.coroutines.tasks.await
@@ -44,7 +45,7 @@ fun BookingDateScreen(
     // Стейт для реальних даних коуча
     var coachName by remember { mutableStateOf("Завантаження...") }
     var coachPriceText by remember { mutableStateOf("") }
-    var coachInitial by remember { mutableStateOf("?") }
+    var coachPhotoUrl by remember { mutableStateOf("") } // НОВИЙ СТЕЙТ
 
     // Завантажуємо слоти ТА профіль коуча
     LaunchedEffect(coachId) {
@@ -56,13 +57,13 @@ fun BookingDateScreen(
                 coachName = doc.getString("name") ?: "Коуч"
                 val p = doc.getString("price")?.toIntOrNull() ?: 50
                 coachPriceText = "${p * 25} ₴"
-                coachInitial = coachName.take(1).uppercase()
+                coachPhotoUrl = doc.getString("photoUrl") ?: "" // ВИТЯГУЄМО ФОТО
             } else {
                 // Фолбек для тестових коучів
                 val d = dummyCoaches.find { it.id.toString() == coachId } ?: dummyCoaches.first()
                 coachName = d.name
                 coachPriceText = "${d.price * 25} ₴"
-                coachInitial = d.name.take(1).uppercase()
+                coachPhotoUrl = d.photoUrl // ВИТЯГУЄМО ФОТО
             }
         } catch (e: Exception) {
             coachName = "Коуч"
@@ -104,9 +105,14 @@ fun BookingDateScreen(
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp)) {
             // Картка Коуча
             Row(modifier = Modifier.fillMaxWidth().background(SurfaceDarkElevated, RoundedCornerShape(16.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                    Text(text = coachInitial, color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                }
+
+                // ВСТАВЛЕНО НОВИЙ АВАТАР
+                UserAvatar(
+                    photoUrl = coachPhotoUrl,
+                    name = coachName,
+                    modifier = Modifier.size(48.dp)
+                )
+
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(text = coachName, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)

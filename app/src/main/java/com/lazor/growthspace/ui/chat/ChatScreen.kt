@@ -14,20 +14,23 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.firestore.FirebaseFirestore
 import com.lazor.growthspace.data.model.Message
+import com.lazor.growthspace.ui.components.UserAvatar
 import com.lazor.growthspace.ui.theme.*
+import kotlinx.coroutines.tasks.await
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     coachName: String,
-    coachId: String, // Передаємо ID коуча, з яким спілкуємось
+    coachId: String,
+    coachPhotoUrl: String = "",
     onBackClick: () -> Unit,
     viewModel: ChatViewModel = koinViewModel()
 ) {
@@ -35,12 +38,28 @@ fun ChatScreen(
     var textState by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    // Починаємо слухати повідомлення при вході в чат
+    // Стейт для збереження підтягнутого фото
+    var realPhotoUrl by remember { mutableStateOf(coachPhotoUrl) }
+
+    // Завантажуємо повідомлення ТА фотографію коуча
     LaunchedEffect(coachId) {
         viewModel.listenForMessages(coachId)
+
+        // Дістаємо фото напряму з бази
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val doc = db.collection("users").document(coachId).get().await()
+            if (doc.exists()) {
+                val fetchedPhoto = doc.getString("photoUrl")
+                if (!fetchedPhoto.isNullOrBlank()) {
+                    realPhotoUrl = fetchedPhoto
+                }
+            }
+        } catch (e: Exception) {
+            // Ігноруємо помилку, залишиться дефолтна аватарка
+        }
     }
 
-    // Авто-скрол до останнього повідомлення при оновленні списку
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -53,9 +72,12 @@ fun ChatScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(40.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                            Text(coachName.take(1), color = TextWhite, fontWeight = FontWeight.Bold)
-                        }
+                        // Використовуємо наш реальний URL
+                        UserAvatar(
+                            photoUrl = realPhotoUrl,
+                            name = coachName,
+                            modifier = Modifier.size(40.dp)
+                        )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(coachName, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
@@ -69,7 +91,6 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            // Поле введення повідомлення
             Surface(color = SurfaceDark, modifier = Modifier.imePadding()) {
                 Row(
                     modifier = Modifier
@@ -118,7 +139,7 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(messages) { message ->
-                val isMine = message.senderId != coachId // Якщо senderId не дорівнює coachId, значить це наше
+                val isMine = message.senderId != coachId
                 ChatBubble(message = message, isMine = isMine)
             }
         }

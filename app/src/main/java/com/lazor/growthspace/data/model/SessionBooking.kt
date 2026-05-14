@@ -8,6 +8,10 @@ data class SessionBooking(
     val clientName: String = "",
     val date: String = "",      // Формат "2026-05-20"
     val time: String = "",      // Формат "14:00"
+    val durationMin: Int = 60,
     val status: String = "available", // available, pending, confirmed, cancelled, completed
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val notes: String = "",         // Загальні нотатки (бачать обидва)
+    val privateNotes: String = "",   // Приватні нотатки (тільки для коуча)
+    val photoUrl: String = ""
 )

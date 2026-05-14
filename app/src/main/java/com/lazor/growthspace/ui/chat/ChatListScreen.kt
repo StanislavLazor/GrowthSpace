@@ -26,6 +26,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.lazor.growthspace.data.model.Message
 import com.lazor.growthspace.data.model.User
+import com.lazor.growthspace.ui.components.UserAvatar
 import com.lazor.growthspace.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -38,35 +39,27 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
     val db = FirebaseFirestore.getInstance()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-    // Стейт для інших користувачів (без нас)
     val otherUsersState = remember { mutableStateOf<List<User>>(emptyList()) }
-
-    // Стейт для зберігання останнього повідомлення кожного чату: Map<ІншийUserId, Message>
     val lastMessages = remember { mutableStateMapOf<String, Message>() }
-
     val isLoading = remember { mutableStateOf(true) }
 
-    // Завантаження даних
     LaunchedEffect(currentUserId) {
         if (currentUserId.isEmpty()) return@LaunchedEffect
 
-        // 1. Отримуємо всіх користувачів
         db.collection("users")
             .get()
             .addOnSuccessListener { snapshot ->
                 val allUsers = snapshot.toObjects(User::class.java)
-                // ФІЛЬТРУЄМО СЕБЕ
                 val filteredUsers = allUsers.filter { it.id != currentUserId }
                 otherUsersState.value = filteredUsers
                 isLoading.value = false
 
-                // 2. Для кожного співрозмовника шукаємо останнє повідомлення
                 filteredUsers.forEach { user ->
                     val chatId = if (currentUserId < user.id) "${currentUserId}_${user.id}" else "${user.id}_${currentUserId}"
 
                     db.collection("chats").document(chatId).collection("messages")
-                        .orderBy("timestamp", Query.Direction.DESCENDING) // Найновіші зверху
-                        .limit(1) // Беремо тільки одне
+                        .orderBy("timestamp", Query.Direction.DESCENDING)
+                        .limit(1)
                         .addSnapshotListener { msgSnapshot, _ ->
                             val lastMsg = msgSnapshot?.documents?.firstOrNull()?.toObject(Message::class.java)
                             if (lastMsg != null) {
@@ -80,7 +73,6 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
             }
     }
 
-    // Сортуємо список: спочатку ті, з ким є переписка (найновіші зверху), потім інші
     val sortedActiveDialogs = otherUsersState.value.sortedByDescending { user ->
         lastMessages[user.id]?.timestamp ?: 0L
     }
@@ -106,7 +98,6 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
                     .padding(innerPadding),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
-                // 1. Пошук
                 item {
                     OutlinedTextField(
                         value = searchQuery,
@@ -132,7 +123,6 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
                     Spacer(modifier = Modifier.height(24.dp))
                 }
 
-                // 2. Рекомендовані
                 item {
                     Text(
                         text = "РЕКОМЕНДОВАНІ",
@@ -147,7 +137,6 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
                             .padding(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Беремо перших 4-х для рекомендацій
                         otherUsersState.value.take(4).forEach { user ->
                             RecommendedCoachItem(
                                 user = user,
@@ -158,7 +147,6 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
                     Spacer(modifier = Modifier.height(32.dp))
                 }
 
-                // 3. Активні діалоги
                 item {
                     Text(
                         text = "АКТИВНІ ДІАЛОГИ",
@@ -169,24 +157,20 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
                     )
                 }
 
-                // Використовуємо відсортований список
                 items(sortedActiveDialogs) { user ->
                     val lastMsg = lastMessages[user.id]
 
-                    // Форматуємо час
                     val timeString = if (lastMsg != null) {
                         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(lastMsg.timestamp))
                     } else ""
 
-                    // Якщо повідомлення немає, показуємо заглушку
                     val messageText = lastMsg?.text ?: "Натисніть, щоб почати діалог"
-
-                    // Виділяємо непрочитані (якщо останнє повідомлення не від нас)
                     val isUnread = lastMsg != null && !lastMsg.isRead && lastMsg.senderId != currentUserId
 
                     ChatItemRow(
                         name = user.name,
                         id = user.id,
+                        photoUrl = user.photoUrl, // Передаємо нове поле!
                         lastMessage = messageText,
                         time = timeString,
                         isUnread = isUnread,
@@ -194,7 +178,6 @@ fun ChatListScreen(onChatClick: (String, String) -> Unit) {
                     )
                 }
 
-                // 4. Архів
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
                     ArchiveButton()
@@ -212,20 +195,11 @@ fun RecommendedCoachItem(user: User, onChatClick: (String, String) -> Unit) {
             .width(76.dp)
             .clickable { onChatClick(user.name, user.id) }
     ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .background(SurfaceDarkElevated, CircleShape)
-                .clip(CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (user.name.isNotEmpty()) user.name.take(1) else "?",
-                color = TextWhite,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        UserAvatar(
+            photoUrl = user.photoUrl,
+            name = user.name,
+            modifier = Modifier.size(64.dp)
+        )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = user.name,
@@ -241,6 +215,7 @@ fun RecommendedCoachItem(user: User, onChatClick: (String, String) -> Unit) {
 fun ChatItemRow(
     name: String,
     id: String,
+    photoUrl: String,
     lastMessage: String,
     time: String,
     isUnread: Boolean,
@@ -253,19 +228,11 @@ fun ChatItemRow(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .background(SurfaceDarkElevated, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (name.isNotEmpty()) name.take(1) else "?",
-                color = TextWhite,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        UserAvatar(
+            photoUrl = photoUrl,
+            name = name,
+            modifier = Modifier.size(56.dp)
+        )
 
         Spacer(modifier = Modifier.width(16.dp))
 
@@ -301,7 +268,6 @@ fun ChatItemRow(
             )
         }
 
-        // Синя крапка для нових повідомлень
         if (isUnread) {
             Spacer(modifier = Modifier.width(8.dp))
             Box(

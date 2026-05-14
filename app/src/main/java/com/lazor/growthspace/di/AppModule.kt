@@ -29,7 +29,7 @@ val appModule = module {
     viewModel { ProfileViewModel(get(), get()) }
     viewModel { EditProfileViewModel(get(), get()) }
     viewModel { HomeViewModel(get()) }
-    viewModel { CoachViewModel(get()) }
+    viewModel { CoachViewModel(get(), get()) }
     viewModel { ProgressViewModel(get(), get()) }
     viewModel { SessionsViewModel(get(), get()) }
     viewModel { ChatViewModel(get(), get()) }

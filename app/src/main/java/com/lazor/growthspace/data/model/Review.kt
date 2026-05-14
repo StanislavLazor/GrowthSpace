@@ -1,11 +1,12 @@
 package com.lazor.growthspace.data.model
 
-data class Message(
+data class Review(
     val id: String = "",
-    val senderId: String = "",
-    val receiverId: String = "",
+    val coachId: String = "",
+    val clientId: String = "",
+    val clientName: String = "",
+    val rating: Int = 5,
     val text: String = "",
     val timestamp: Long = System.currentTimeMillis(),
-    val isRead: Boolean = false,
     val photoUrl: String = ""
 )
