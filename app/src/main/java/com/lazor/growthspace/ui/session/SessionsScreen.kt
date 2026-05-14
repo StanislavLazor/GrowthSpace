@@ -5,8 +5,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -25,8 +25,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,16 +37,15 @@ import org.koin.androidx.compose.koinViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionsScreen(
-    viewModel: SessionsViewModel = koinViewModel()
+    viewModel: SessionsViewModel = koinViewModel(),
+    onSessionClick: (String) -> Unit // ДОДАНО: Колбек для кліку по сесії
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0 - Майбутні, 1 - Минулі
 
-    // ПІДКЛЮЧАЄМО VIEWMODEL
     val state by viewModel.state.collectAsState()
 
-    // Сортуємо сесії на майбутні і минулі
     val upcomingSessions = state.sessions.filter { it.status in listOf("pending", "confirmed", "available") }
-    val pastSessions = state.sessions.filter { it.status in listOf("completed", "cancelled") }
+    val pastSessions = state.sessions.filter { it.status in listOf("completed", "cancelled", "canceled") } // Додав canceled на всяк випадок
 
     val isCoach = state.currentUser?.role == "coach"
 
@@ -102,7 +101,8 @@ fun SessionsScreen(
                                         session = session,
                                         isCoach = isCoach,
                                         onConfirm = { viewModel.updateSessionStatus(session.id, "confirmed") },
-                                        onCancel = { viewModel.updateSessionStatus(session.id, "cancelled") }
+                                        onCancel = { viewModel.updateSessionStatus(session.id, "canceled") }, // Використовуємо canceled як у БД
+                                        onClick = { onSessionClick(session.id) } // ПЕРЕДАЄМО КЛІК
                                     )
                                 }
                                 item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -115,14 +115,9 @@ fun SessionsScreen(
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 items(pastSessions) { session ->
                                     PastSessionCard(
-                                        name = if (isCoach) session.clientName else session.coachName,
-                                        specialization = if (isCoach) "Клієнт" else "Коуч",
-                                        date = session.date,
-                                        time = session.time,
-                                        statusText = getStatusText(session.status),
-                                        statusBgColor = if (session.status == "cancelled") Color(0xFF3E1A1A) else SurfaceDarkElevated,
-                                        statusTextColor = if (session.status == "cancelled") Color(0xFFFF5252) else TextGray,
-                                        showRepeatButton = session.status == "completed" && !isCoach
+                                        session = session, // Передаємо цілий об'єкт для зручності
+                                        isCoach = isCoach,
+                                        onClick = { onSessionClick(session.id) } // ПЕРЕДАЄМО КЛІК
                                     )
                                 }
                                 item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -142,13 +137,12 @@ fun EmptyStateMessage(message: String) {
     }
 }
 
-// ДОПОМІЖНІ ФУНКЦІЇ ДЛЯ СТАТУСІВ
 fun getStatusText(status: String): String = when(status) {
     "available" -> "Вільний слот"
     "pending" -> "Очікує підтвердження"
     "confirmed" -> "Підтверджено"
     "completed" -> "Завершено"
-    "cancelled" -> "Скасовано"
+    "cancelled", "canceled" -> "Скасовано"
     else -> status
 }
 
@@ -156,7 +150,7 @@ fun getStatusColor(status: String): Color = when(status) {
     "available" -> Color(0xFF00BCD4)
     "pending" -> Color(0xFFFFA000)
     "confirmed" -> Color(0xFF00E676)
-    "cancelled" -> Color(0xFFFF5252)
+    "cancelled", "canceled" -> Color(0xFFFF5252)
     else -> TextGray
 }
 
@@ -165,7 +159,8 @@ fun DynamicSessionCard(
     session: SessionBooking,
     isCoach: Boolean,
     onConfirm: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onClick: () -> Unit // ДОДАНО
 ) {
     val displayName = if (isCoach) {
         if (session.clientId.isEmpty()) "Вільний слот" else session.clientName
@@ -185,6 +180,8 @@ fun DynamicSessionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp)) // Спочатку кліпаємо форму
+            .clickable { onClick() }         // Потім додаємо клік (щоб ефект натискання був у формі)
             .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
             .padding(16.dp)
     ) {
@@ -263,7 +260,7 @@ fun DynamicSessionCard(
             } else if (session.status == "confirmed") {
                 // Підтверджена сесія для обох
                 OutlinedButton(
-                    onClick = { /* Відкрити чат */ },
+                    onClick = { /* TODO: Відкрити чат напряму */ },
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, SurfaceDarkElevated),
@@ -274,14 +271,14 @@ fun DynamicSessionCard(
                     Text("Чат", fontWeight = FontWeight.Bold)
                 }
                 Button(
-                    onClick = { /* Дзвінок */ },
+                    onClick = onClick, // Відкриває деталі
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                 ) {
                     Icon(Icons.Outlined.Videocam, contentDescription = null, tint = BackgroundDark, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Приєднатись", color = BackgroundDark, fontWeight = FontWeight.Bold)
+                    Text("Деталі", color = BackgroundDark, fontWeight = FontWeight.Bold)
                 }
             } else if (isCoach && session.status == "available") {
                 // Коуч бачить свій вільний слот
@@ -294,6 +291,73 @@ fun DynamicSessionCard(
                 ) {
                     Text("Видалити слот", fontWeight = FontWeight.Bold)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun PastSessionCard(
+    session: SessionBooking, // ТЕПЕР ПРИЙМАЄ ЦІЛУ СЕСІЮ
+    isCoach: Boolean,
+    onClick: () -> Unit // ДОДАНО
+) {
+    val name = if (isCoach) session.clientName else session.coachName
+    val specialization = if (isCoach) "Клієнт" else "Коуч"
+    val statusText = getStatusText(session.status)
+    val isCancelled = session.status == "cancelled" || session.status == "canceled"
+    val statusBgColor = if (isCancelled) Color(0xFF3E1A1A) else SurfaceDarkElevated
+    val statusTextColor = if (isCancelled) Color(0xFFFF5252) else TextGray
+    val showRepeatButton = session.status == "completed" && !isCoach
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp)) // Спочатку кліпаємо форму
+            .clickable { onClick() }         // Потім додаємо клік
+            .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
+            .padding(16.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Row {
+                Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
+                    val initial = if (name.isNotEmpty()) name.take(1) else "?"
+                    Text(initial, color = TextWhite, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(name, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(specialization, color = TextGray, fontSize = 14.sp)
+                }
+            }
+            Surface(color = statusBgColor, shape = RoundedCornerShape(12.dp)) {
+                Text(statusText, color = statusTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            Text(session.date, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Box(modifier = Modifier.height(16.dp).width(1.dp).background(SurfaceDarkElevated))
+            Spacer(modifier = Modifier.weight(1f))
+            Text(session.time, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (showRepeatButton) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onClick, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
+                    Text("Нотатки", color = TextWhite, fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(onClick = { /* TODO: Повторити сесію (поки не реалізовано) */ }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
+                    Text("Повторити", color = TextWhite, fontWeight = FontWeight.Bold)
+                }
+            }
+        } else {
+            OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
+                Text("Переглянути деталі", color = TextWhite, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -316,7 +380,6 @@ fun AnimatedTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             label = "indicatorOffset"
         )
 
-        // Синя плашка
         Box(
             modifier = Modifier
                 .offset(x = indicatorOffset)
@@ -325,7 +388,6 @@ fun AnimatedTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                 .background(PrimaryBlue, RoundedCornerShape(24.dp))
         )
 
-        // Тексти кнопок
         Row(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
@@ -360,63 +422,6 @@ fun AnimatedTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun PastSessionCard(
-    name: String, specialization: String, date: String, time: String,
-    statusText: String, statusBgColor: Color, statusTextColor: Color,
-    showRepeatButton: Boolean = true
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
-            .padding(16.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-            Row {
-                Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                    val initial = if (name.isNotEmpty()) name.take(1) else "?"
-                    Text(initial, color = TextWhite, fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(name, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text(specialization, color = TextGray, fontSize = 14.sp)
-                }
-            }
-            Surface(color = statusBgColor, shape = RoundedCornerShape(12.dp)) {
-                Text(statusText, color = statusTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-            Text(date, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Box(modifier = Modifier.height(16.dp).width(1.dp).background(SurfaceDarkElevated))
-            Spacer(modifier = Modifier.weight(1f))
-            Text(time, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (showRepeatButton) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = { }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
-                    Text("Нотатки", color = TextWhite, fontWeight = FontWeight.Bold)
-                }
-                OutlinedButton(onClick = { }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
-                    Text("Повторити", color = TextWhite, fontWeight = FontWeight.Bold)
-                }
-            }
-        } else {
-            OutlinedButton(onClick = { }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
-                Text("Переглянути деталі", color = TextWhite, fontWeight = FontWeight.Bold)
             }
         }
     }

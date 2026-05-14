@@ -28,7 +28,6 @@ class SessionsViewModel(
     private val _state = MutableStateFlow(SessionsState())
     val state: StateFlow<SessionsState> = _state.asStateFlow()
 
-    // Стейт для зберігання вільних слотів конкретного коуча
     private val _coachAvailableSlots = MutableStateFlow<List<SessionBooking>>(emptyList())
     val coachAvailableSlots: StateFlow<List<SessionBooking>> = _coachAvailableSlots.asStateFlow()
 
@@ -39,56 +38,91 @@ class SessionsViewModel(
     private fun loadUserDataAndSessions() {
         viewModelScope.launch {
             try {
-                val userId = authRepository.getCurrentUserId() ?: return@launch
+                val userId = authRepository.getCurrentUserId()
 
-                // 1. Отримуємо дані користувача (щоб знати роль та ім'я)
+                // ЗАПОБІЖНИК 1: Якщо користувача немає, вимикаємо лоадер
+                if (userId == null) {
+                    _state.value = _state.value.copy(isLoading = false)
+                    return@launch
+                }
+
                 val userDoc = firestore.collection("users").document(userId).get().await()
                 val user = userDoc.toObject(User::class.java)
 
                 _state.value = _state.value.copy(currentUser = user)
 
-                // 2. Слухаємо сесії в реальному часі залежно від ролі
-                if (user?.role == "coach") {
-                    firestore.collection("sessions")
-                        .whereEqualTo("coachId", userId)
-                        .addSnapshotListener { snapshot, error ->
-                            if (error != null) {
-                                Log.e("SessionsVM", "Помилка завантаження сесій коуча", error)
-                                return@addSnapshotListener
-                            }
-                            val sessions = snapshot?.documents?.mapNotNull { doc ->
-                                doc.toObject(SessionBooking::class.java)?.copy(id = doc.id)
-                            } ?: emptyList()
-                            _state.value = _state.value.copy(
-                                sessions = sessions.sortedByDescending { it.date },
-                                isLoading = false
-                            )
+                val queryField = if (user?.role == "coach") "coachId" else "clientId"
+
+                firestore.collection("sessions")
+                    .whereEqualTo(queryField, userId)
+                    // ВИДАЛЕНО .orderBy() -> Тепер Firebase не буде вимагати індексів!
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            Log.e("SessionsVM", "Помилка завантаження сесій", error)
+                            // ЗАПОБІЖНИК 2: Вимикаємо лоадер при помилці
+                            _state.value = _state.value.copy(isLoading = false)
+                            return@addSnapshotListener
                         }
-                } else {
-                    firestore.collection("sessions")
-                        .whereEqualTo("clientId", userId)
-                        .addSnapshotListener { snapshot, error ->
-                            if (error != null) {
-                                Log.e("SessionsVM", "Помилка завантаження сесій клієнта", error)
-                                return@addSnapshotListener
-                            }
-                            val sessions = snapshot?.documents?.mapNotNull { doc ->
-                                doc.toObject(SessionBooking::class.java)?.copy(id = doc.id)
-                            } ?: emptyList()
-                            _state.value = _state.value.copy(
-                                sessions = sessions.sortedByDescending { it.date },
-                                isLoading = false
-                            )
-                        }
-                }
+
+                        val sessions = snapshot?.documents?.mapNotNull { doc ->
+                            doc.toObject(SessionBooking::class.java)?.copy(id = doc.id)
+                        } ?: emptyList()
+
+                        // СОРТУЄМО ЛОКАЛЬНО: Спочатку за датою, потім за часом (найновіші зверху)
+                        val sortedSessions = sessions.sortedWith(
+                            compareByDescending<SessionBooking> { it.date }.thenByDescending { it.time }
+                        )
+
+                        _state.value = _state.value.copy(
+                            sessions = sortedSessions,
+                            isLoading = false // Успішне завантаження
+                        )
+                    }
             } catch (e: Exception) {
                 Log.e("SessionsVM", "Помилка ініціалізації", e)
+                // ЗАПОБІЖНИК 3: Вимикаємо лоадер, якщо впало щось інше
                 _state.value = _state.value.copy(isLoading = false)
             }
         }
     }
 
-    // Завантажуємо вільні слоти для екранів календаря та часу
+    // КЕРУВАННЯ НОТАТКАМИ
+    fun saveSessionNotes(sessionId: String, notes: String, privateNotes: String? = null) {
+        if (sessionId.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                val updates = mutableMapOf<String, Any>("notes" to notes)
+                // Приватні нотатки додаємо лише якщо вони передані (тільки для коуча)
+                privateNotes?.let { updates["privateNotes"] = it }
+
+                firestore.collection("sessions").document(sessionId)
+                    .update(updates)
+                    .await()
+                Log.d("SessionsVM", "Нотатки успішно збережено для $sessionId")
+            } catch (e: Exception) {
+                Log.e("SessionsVM", "Помилка збереження нотаток", e)
+            }
+        }
+    }
+
+    // ОНОВЛЕННЯ СТАТУСУ (Підтвердити, Скасувати, Завершити)
+    fun updateSessionStatus(sessionId: String, newStatus: String) {
+        if (sessionId.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                firestore.collection("sessions").document(sessionId)
+                    .update("status", newStatus)
+                    .await()
+                Log.d("SessionsVM", "Статус змінено на $newStatus для $sessionId")
+            } catch (e: Exception) {
+                Log.e("SessionsVM", "Помилка оновлення статусу", e)
+            }
+        }
+    }
+
+    // РОБОТА ЗІ СЛОТАМИ
     fun loadAvailableSlotsForCoach(coachId: String) {
         viewModelScope.launch {
             firestore.collection("sessions")
@@ -104,7 +138,6 @@ class SessionsViewModel(
         }
     }
 
-    // [ТІЛЬКИ ДЛЯ КОУЧА] Створення нового вільного слоту
     fun createAvailableSlot(date: String, time: String) {
         viewModelScope.launch {
             try {
@@ -113,7 +146,7 @@ class SessionsViewModel(
 
                 val newSlot = SessionBooking(
                     id = UUID.randomUUID().toString(),
-                    coachId = "1",
+                    coachId = user.id,
                     coachName = user.name,
                     date = date,
                     time = time,
@@ -121,20 +154,17 @@ class SessionsViewModel(
                 )
 
                 firestore.collection("sessions").document(newSlot.id).set(newSlot).await()
-                Log.d("SessionsVM", "Слот успішно створено: ${newSlot.id}")
             } catch (e: Exception) {
                 Log.e("SessionsVM", "Помилка створення слоту", e)
             }
         }
     }
 
-    // [ТІЛЬКИ ДЛЯ КЛІЄНТА] Створення запиту на нову сесію (з екрана підтвердження)
     fun requestSessionAsClient(coachId: String, coachName: String, date: String, time: String, onComplete: () -> Unit) {
         viewModelScope.launch {
             try {
                 val user = _state.value.currentUser ?: return@launch
 
-                // Перевіряємо, чи існує вже вільний слот на цей час
                 val availableDocs = firestore.collection("sessions")
                     .whereEqualTo("coachId", coachId)
                     .whereEqualTo("date", date)
@@ -143,7 +173,6 @@ class SessionsViewModel(
                     .get().await()
 
                 if (!availableDocs.isEmpty) {
-                    // Якщо слот є, оновлюємо його (Клієнт займає його)
                     val slotId = availableDocs.documents.first().id
                     val updates = mapOf(
                         "clientId" to user.id,
@@ -152,7 +181,6 @@ class SessionsViewModel(
                     )
                     firestore.collection("sessions").document(slotId).update(updates).await()
                 } else {
-                    // Якщо немає (клієнт пропонує свій час), створюємо новий
                     val newSession = SessionBooking(
                         id = UUID.randomUUID().toString(),
                         coachId = coachId,
@@ -168,40 +196,6 @@ class SessionsViewModel(
                 onComplete()
             } catch (e: Exception) {
                 Log.e("SessionsVM", "Помилка створення запиту", e)
-            }
-        }
-    }
-
-    // [ТІЛЬКИ ДЛЯ КЛІЄНТА] Бронювання вже існуючого вільного слоту
-    fun bookSlot(sessionId: String) {
-        if (sessionId.isEmpty()) return
-
-        viewModelScope.launch {
-            try {
-                val user = _state.value.currentUser ?: return@launch
-                val updates = mapOf(
-                    "clientId" to user.id,
-                    "clientName" to user.name,
-                    "status" to "pending"
-                )
-                firestore.collection("sessions").document(sessionId).update(updates).await()
-                Log.d("SessionsVM", "Слот заброньовано: $sessionId")
-            } catch (e: Exception) {
-                Log.e("SessionsVM", "Помилка бронювання", e)
-            }
-        }
-    }
-
-    // [ТІЛЬКИ ДЛЯ КОУЧА] Підтвердження або скасування сесії
-    fun updateSessionStatus(sessionId: String, newStatus: String) {
-        if (sessionId.isEmpty()) return
-
-        viewModelScope.launch {
-            try {
-                firestore.collection("sessions").document(sessionId).update("status", newStatus).await()
-                Log.d("SessionsVM", "Статус змінено на $newStatus для $sessionId")
-            } catch (e: Exception) {
-                Log.e("SessionsVM", "Помилка оновлення статусу", e)
             }
         }
     }

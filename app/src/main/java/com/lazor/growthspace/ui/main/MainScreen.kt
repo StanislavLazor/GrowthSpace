@@ -3,6 +3,7 @@ package com.lazor.growthspace.ui.main
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -21,7 +22,10 @@ import com.lazor.growthspace.ui.home.HomeScreen
 import com.lazor.growthspace.ui.profile.EditProfileScreen
 import com.lazor.growthspace.ui.profile.ProfileScreen
 import com.lazor.growthspace.ui.progress.ProgressScreen
+import com.lazor.growthspace.ui.session.SessionDetailsScreen
 import com.lazor.growthspace.ui.session.SessionsScreen
+import com.lazor.growthspace.ui.session.SessionsViewModel
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun MainScreen(
@@ -140,12 +144,11 @@ fun MainScreen(
                     date = date,
                     time = time,
                     onGoToSessions = {
-                        // 1. ВИДАЛЯЄМО ВСЕ АЖ ДО ГОЛОВНОГО ЕКРАНА (Прямо зараз, без очікування)
+                        // 1. ВИДАЛЯЄМО ВСЕ АЖ ДО ГОЛОВНОГО ЕКРАНА
                         navController.popBackStack(Routes.HOME, inclusive = false)
 
                         // 2. ТЕПЕР ПЕРЕХОДИМО НА СЕСІЇ
                         navController.navigate("sessions") {
-                            // Очищаємо залишки, якщо вони раптом десь завалялися
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = false
                             }
@@ -157,7 +160,45 @@ fun MainScreen(
             }
 
             // ВКЛАДКИ BOTTOM NAV
-            composable("sessions") { SessionsScreen() }
+            composable("sessions") {
+                SessionsScreen(
+                    onSessionClick = { sessionId ->
+                        navController.navigate("session_details/$sessionId")
+                    }
+                )
+            }
+
+            composable("session_details/{sessionId}") { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
+
+                // Отримуємо ViewModel через Koin
+                val sessionsViewModel: SessionsViewModel = koinViewModel()
+                val state by sessionsViewModel.state.collectAsState()
+
+                // Шукаємо потрібну сесію за ID зі списку завантажених
+                val session = state.sessions.find { it.id == sessionId }
+                val currentUser = state.currentUser
+
+                if (session != null && currentUser != null) {
+                    val isCoach = currentUser.role == "coach"
+                    val otherUserName = if (isCoach) session.clientName else session.coachName
+
+                    SessionDetailsScreen(
+                        session = session,
+                        isCoach = isCoach,
+                        otherUserName = otherUserName,
+                        onBackClick = { navController.popBackStack() },
+                        onStatusChange = { newStatus ->
+                            sessionsViewModel.updateSessionStatus(session.id, newStatus)
+                            navController.popBackStack() // Повертаємось назад після зміни статусу
+                        },
+                        onSaveNotes = { notes, privateNotes ->
+                            sessionsViewModel.saveSessionNotes(session.id, notes, privateNotes.takeIf { isCoach })
+                            navController.popBackStack() // Повертаємось назад після збереження
+                        }
+                    )
+                }
+            }
 
             composable("chat") {
                 ChatListScreen(
