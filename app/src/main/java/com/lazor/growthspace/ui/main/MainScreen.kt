@@ -5,37 +5,34 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.lazor.growthspace.ui.coach.BookingConfirmScreen
 import androidx.navigation.navArgument
 import com.lazor.growthspace.navigation.Routes
-import com.lazor.growthspace.ui.coach.BookingTimeScreen
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import com.lazor.growthspace.ui.coach.BookingDateScreen
-import com.lazor.growthspace.ui.coach.CoachProfileScreen
-import com.lazor.growthspace.ui.components.BottomNavigationBar
-import com.lazor.growthspace.ui.coach.BookingStatusScreen
-import com.lazor.growthspace.ui.session.SessionsScreen
-import com.lazor.growthspace.ui.home.HomeScreen
-import com.lazor.growthspace.ui.progress.ProgressScreen
 import com.lazor.growthspace.ui.chat.ChatListScreen
+import com.lazor.growthspace.ui.chat.ChatScreen
+import com.lazor.growthspace.ui.coach.*
+import com.lazor.growthspace.ui.components.BottomNavigationBar
+import com.lazor.growthspace.ui.home.HomeScreen
 import com.lazor.growthspace.ui.profile.EditProfileScreen
 import com.lazor.growthspace.ui.profile.ProfileScreen
+import com.lazor.growthspace.ui.progress.ProgressScreen
+import com.lazor.growthspace.ui.session.SessionsScreen
 
 @Composable
-fun MainScreen(onLogout: () -> Unit,
-               onNavigateToLegal: (String) -> Unit = {}) {
+fun MainScreen(
+    onLogout: () -> Unit,
+    onNavigateToLegal: (String) -> Unit = {}
+) {
     val navController = rememberNavController()
 
-    // СЛУХАЄМО ПОТОЧНИЙ МАРШРУТ
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // СПИСОК МАРШРУТІВ, ДЕ МЕНЮ МАЄ БУТИ ВИДИМИМ
     val bottomNavRoutes = listOf(
         Routes.HOME,
         "sessions",
@@ -44,7 +41,6 @@ fun MainScreen(onLogout: () -> Unit,
         "profile"
     )
 
-    // Показуємо меню, тільки якщо поточний маршрут є у списку головних вкладок
     val showBottomBar = currentRoute in bottomNavRoutes
 
     Scaffold(
@@ -59,12 +55,12 @@ fun MainScreen(onLogout: () -> Unit,
             startDestination = Routes.HOME,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // ГОЛОВНИЙ ЕКРАН
+            // ГОЛОВНА ВКЛАДКА (КОУЧІ)
             composable(Routes.HOME) {
                 HomeScreen(navController = navController)
             }
 
-            // ПРОФІЛЬ КОУЧА
+            // ПРОЦЕС БРОНЮВАННЯ (Ці екрани не мають BottomBar)
             composable(
                 route = Routes.COACH_PROFILE,
                 arguments = listOf(navArgument("id") { type = NavType.StringType })
@@ -73,14 +69,10 @@ fun MainScreen(onLogout: () -> Unit,
                 CoachProfileScreen(
                     coachId = coachId,
                     onBackClick = { navController.popBackStack() },
-                    onBookSessionClick = {
-                        // Перехід на календар
-                        navController.navigate("booking_date/$coachId")
-                    }
+                    onBookSessionClick = { navController.navigate("booking_date/$coachId") }
                 )
             }
 
-            // ЕКРАН ВИБОРУ ДАТИ (КАЛЕНДАР)
             composable(
                 route = Routes.BOOKING_DATE,
                 arguments = listOf(navArgument("id") { type = NavType.StringType })
@@ -89,14 +81,10 @@ fun MainScreen(onLogout: () -> Unit,
                 BookingDateScreen(
                     coachId = coachId,
                     onBackClick = { navController.popBackStack() },
-                    onNextClick = { selectedDate ->
-                        // ТЕПЕР ЙДЕМО НА ВИБІР ЧАСУ
-                        navController.navigate("booking_time/$coachId/$selectedDate")
-                    }
+                    onNextClick = { date -> navController.navigate("booking_time/$coachId/$date") }
                 )
             }
 
-            // 2. ВИБІР ЧАСУ
             composable(
                 route = Routes.BOOKING_TIME,
                 arguments = listOf(
@@ -106,15 +94,12 @@ fun MainScreen(onLogout: () -> Unit,
             ) { backStackEntry ->
                 val coachId = backStackEntry.arguments?.getString("id") ?: ""
                 val date = backStackEntry.arguments?.getString("date") ?: ""
-
                 BookingTimeScreen(
                     coachId = coachId,
                     selectedDate = date,
                     onBackClick = { navController.popBackStack() },
                     onChangeDateClick = { navController.popBackStack() },
-                    onConfirmClick = { selectedTime ->
-                        navController.navigate("booking_confirmation/$coachId/$date/$selectedTime")
-                    }
+                    onConfirmClick = { time -> navController.navigate("booking_confirmation/$coachId/$date/$time") }
                 )
             }
 
@@ -129,21 +114,15 @@ fun MainScreen(onLogout: () -> Unit,
                 val coachId = backStackEntry.arguments?.getString("id") ?: ""
                 val date = backStackEntry.arguments?.getString("date") ?: ""
                 val time = backStackEntry.arguments?.getString("time") ?: ""
-
                 BookingConfirmScreen(
                     coachId = coachId,
                     selectedDate = date,
                     selectedTime = time,
                     onBackClick = { navController.popBackStack() },
-                    onSuccess = {
-                        navController.navigate("booking_status/$coachId/$date/$time") {
-                            popUpTo(Routes.HOME)
-                        }
-                    }
+                    onSuccess = { navController.navigate("booking_status/$coachId/$date/$time") }
                 )
             }
 
-            // СТАТУС БРОНЮВАННЯ
             composable(
                 route = Routes.BOOKING_STATUS,
                 arguments = listOf(
@@ -161,67 +140,73 @@ fun MainScreen(onLogout: () -> Unit,
                     date = date,
                     time = time,
                     onGoToSessions = {
+                        // 1. ВИДАЛЯЄМО ВСЕ АЖ ДО ГОЛОВНОГО ЕКРАНА (Прямо зараз, без очікування)
+                        navController.popBackStack(Routes.HOME, inclusive = false)
+
+                        // 2. ТЕПЕР ПЕРЕХОДИМО НА СЕСІЇ
                         navController.navigate("sessions") {
-                            popUpTo(Routes.HOME)
+                            // Очищаємо залишки, якщо вони раптом десь завалялися
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = false
+                            }
                             launchSingleTop = true
+                            restoreState = false
                         }
                     }
                 )
             }
 
-            // Порожні вкладки для нижнього меню
-            composable("sessions") {
-                SessionsScreen()
-            }
+            // ВКЛАДКИ BOTTOM NAV
+            composable("sessions") { SessionsScreen() }
+
             composable("chat") {
                 ChatListScreen(
-                    onChatClick = { coachName ->
-                        val encodedName = android.net.Uri.encode(coachName)
-                        navController.navigate("chat_room/$encodedName")
+                    onChatClick = { name, id ->
+                        val encodedName = android.net.Uri.encode(name)
+                        navController.navigate("chat_room/$encodedName/$id")
                     }
                 )
             }
 
             composable(
-                route = "chat_room/{coachName}",
-                arguments = listOf(navArgument("coachName") { type = NavType.StringType })
+                route = "chat_room/{coachName}/{coachId}",
+                arguments = listOf(
+                    navArgument("coachName") { type = NavType.StringType },
+                    navArgument("coachId") { type = NavType.StringType }
+                )
             ) { backStackEntry ->
-                val coachName = backStackEntry.arguments?.getString("coachName") ?: "Коуч"
+                val coachName = backStackEntry.arguments?.getString("coachName") ?: "Чат"
+                val coachId = backStackEntry.arguments?.getString("coachId") ?: ""
 
-                // Тимчасова заглушка для ID з чату (теж переведено в String)
-                val coachId = when {
-                    coachName.contains("Олександр") -> "1"
-                    coachName.contains("Олена") -> "2"
-                    coachName.contains("Дмитро") -> "3"
-                    else -> "1"
-                }
-
-                com.lazor.growthspace.ui.chat.ChatScreen(
+                ChatScreen(
                     coachName = coachName,
-                    onBackClick = { navController.popBackStack() },
-                    onProfileClick = {
-                        navController.navigate("coach_profile/$coachId")
-                    }
+                    coachId = coachId,
+                    onBackClick = { navController.popBackStack() }
                 )
             }
-            composable("progress") {
-                ProgressScreen()
-            }
+
+            composable("progress") { ProgressScreen() }
+
             composable("profile") {
                 ProfileScreen(
-                    onLogoutClick = { onLogout()},
-                    onEditAvatarClick = {
-                        navController.navigate("edit_profile")
-                    },
-                    onLegalClick = { type -> onNavigateToLegal(type) }
+                    onLogoutClick = { onLogout() },
+                    onEditAvatarClick = { navController.navigate("edit_profile") },
+                    onLegalClick = { type -> onNavigateToLegal(type) },
+                    onScheduleClick = { navController.navigate("coach_schedule") }
                 )
             }
+
+            // ЕКРАНИ ПРОФІЛЮ (БЕЗ BOTTOM BAR)
             composable("edit_profile") {
                 EditProfileScreen(
                     onBackClick = { navController.popBackStack() },
-                    onSaveClick = {
-                        navController.popBackStack()
-                    }
+                    onSaveClick = { navController.popBackStack() }
+                )
+            }
+
+            composable("coach_schedule") {
+                CoachScheduleScreen(
+                    onBackClick = { navController.popBackStack() }
                 )
             }
         }
