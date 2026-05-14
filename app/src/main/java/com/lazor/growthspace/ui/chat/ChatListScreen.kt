@@ -1,7 +1,6 @@
 package com.lazor.growthspace.ui.chat
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,7 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -23,25 +21,69 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.lazor.growthspace.data.model.Message
+import com.lazor.growthspace.data.model.User
 import com.lazor.growthspace.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatListScreen(onChatClick: (String) -> Unit) {
+fun ChatListScreen(onChatClick: (String, String) -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
 
-    val recommendedCoaches = listOf(
-        RecommendedCoach("Олександр", isOnline = true, hasStory = true),
-        RecommendedCoach("Марія", isOnline = true, hasStory = false),
-        RecommendedCoach("Дмитро", isOnline = false, hasStory = false),
-        RecommendedCoach("Олена", isOnline = false, hasStory = false)
-    )
+    val db = FirebaseFirestore.getInstance()
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-    val chatItems = listOf(
-        ChatItem("Олександр Мельник", "Чи готові ви до нашої насту...", "10:42", unreadCount = 2, isOnline = true),
-        ChatItem("Олена Коваленко", "Дякую за вчорашню зустріч. Ваша...", "Вчора", unreadCount = 0, isOnline = true),
-        ChatItem("Ігор Ткачук", "Я надіслав вам матеріали по та...", "Пн", unreadCount = 0, isOnline = false, isRead = true)
-    )
+    // Стейт для інших користувачів (без нас)
+    val otherUsersState = remember { mutableStateOf<List<User>>(emptyList()) }
+
+    // Стейт для зберігання останнього повідомлення кожного чату: Map<ІншийUserId, Message>
+    val lastMessages = remember { mutableStateMapOf<String, Message>() }
+
+    val isLoading = remember { mutableStateOf(true) }
+
+    // Завантаження даних
+    LaunchedEffect(currentUserId) {
+        if (currentUserId.isEmpty()) return@LaunchedEffect
+
+        // 1. Отримуємо всіх користувачів
+        db.collection("users")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val allUsers = snapshot.toObjects(User::class.java)
+                // ФІЛЬТРУЄМО СЕБЕ
+                val filteredUsers = allUsers.filter { it.id != currentUserId }
+                otherUsersState.value = filteredUsers
+                isLoading.value = false
+
+                // 2. Для кожного співрозмовника шукаємо останнє повідомлення
+                filteredUsers.forEach { user ->
+                    val chatId = if (currentUserId < user.id) "${currentUserId}_${user.id}" else "${user.id}_${currentUserId}"
+
+                    db.collection("chats").document(chatId).collection("messages")
+                        .orderBy("timestamp", Query.Direction.DESCENDING) // Найновіші зверху
+                        .limit(1) // Беремо тільки одне
+                        .addSnapshotListener { msgSnapshot, _ ->
+                            val lastMsg = msgSnapshot?.documents?.firstOrNull()?.toObject(Message::class.java)
+                            if (lastMsg != null) {
+                                lastMessages[user.id] = lastMsg
+                            }
+                        }
+                }
+            }
+            .addOnFailureListener {
+                isLoading.value = false
+            }
+    }
+
+    // Сортуємо список: спочатку ті, з ким є переписка (найновіші зверху), потім інші
+    val sortedActiveDialogs = otherUsersState.value.sortedByDescending { user ->
+        lastMessages[user.id]?.timestamp ?: 0L
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -53,217 +95,245 @@ fun ChatListScreen(onChatClick: (String) -> Unit) {
             )
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
-            // 1. Пошук
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .padding(vertical = 8.dp)
-                        .height(52.dp),
-                    placeholder = { Text("Пошук коучів або чатів...", color = TextGray, fontSize = 15.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextGray) },
-                    shape = RoundedCornerShape(26.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceDarkElevated,
-                        unfocusedContainerColor = SurfaceDarkElevated,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = TextWhite,
-                        unfocusedTextColor = TextWhite
-                    ),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(24.dp))
+        if (isLoading.value) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryBlue)
             }
-
-            // 2. Рекомендовані коучі
-            item {
-                Text(
-                    text = "РЕКОМЕНДОВАНІ КОУЧІ",
-                    color = TextGray,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    recommendedCoaches.forEach { coach ->
-                        RecommendedCoachItem(coach)
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
-            }
-
-            // 3. Активні діалоги
-            item {
-                Text(
-                    text = "АКТИВНІ ДІАЛОГИ",
-                    color = TextGray,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp)
-                )
-            }
-
-            items(chatItems) { chat ->
-                ChatItemRow(chat = chat, onChatClick = onChatClick)
-            }
-
-            // 4. Архівні чати
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .background(SurfaceDarkElevated, RoundedCornerShape(20.dp))
-                        .clip(RoundedCornerShape(20.dp))
-                        .clickable { /* TODO: Відкрити архів */ }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(bottom = 80.dp)
+            ) {
+                // 1. Пошук
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
                         modifier = Modifier
-                            .size(40.dp)
-                            .background(SurfaceDark, CircleShape),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(vertical = 8.dp)
+                            .height(52.dp),
+                        placeholder = { Text("Пошук коучів або чатів...", color = TextGray, fontSize = 15.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextGray) },
+                        shape = RoundedCornerShape(26.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = SurfaceDarkElevated,
+                            unfocusedContainerColor = SurfaceDarkElevated,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = TextWhite,
+                            unfocusedTextColor = TextWhite
+                        ),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
+                // 2. Рекомендовані
+                item {
+                    Text(
+                        text = "РЕКОМЕНДОВАНІ",
+                        color = TextGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(Icons.Default.Archive, contentDescription = null, tint = TextGray, modifier = Modifier.size(20.dp))
+                        // Беремо перших 4-х для рекомендацій
+                        otherUsersState.value.take(4).forEach { user ->
+                            RecommendedCoachItem(
+                                user = user,
+                                onChatClick = onChatClick
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text("Архівні чати", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Text("3", color = TextGray, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextGray)
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+
+                // 3. Активні діалоги
+                item {
+                    Text(
+                        text = "АКТИВНІ ДІАЛОГИ",
+                        color = TextGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp)
+                    )
+                }
+
+                // Використовуємо відсортований список
+                items(sortedActiveDialogs) { user ->
+                    val lastMsg = lastMessages[user.id]
+
+                    // Форматуємо час
+                    val timeString = if (lastMsg != null) {
+                        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(lastMsg.timestamp))
+                    } else ""
+
+                    // Якщо повідомлення немає, показуємо заглушку
+                    val messageText = lastMsg?.text ?: "Натисніть, щоб почати діалог"
+
+                    // Виділяємо непрочитані (якщо останнє повідомлення не від нас)
+                    val isUnread = lastMsg != null && !lastMsg.isRead && lastMsg.senderId != currentUserId
+
+                    ChatItemRow(
+                        name = user.name,
+                        id = user.id,
+                        lastMessage = messageText,
+                        time = timeString,
+                        isUnread = isUnread,
+                        onChatClick = onChatClick
+                    )
+                }
+
+                // 4. Архів
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    ArchiveButton()
                 }
             }
         }
     }
 }
 
-// ==========================================
-// ДОПОМІЖНІ КОМПОНЕНТИ ТА МОДЕЛІ ДАНИХ
-// ==========================================
-
-data class RecommendedCoach(val name: String, val isOnline: Boolean, val hasStory: Boolean)
-data class ChatItem(val name: String, val message: String, val time: String, val unreadCount: Int, val isOnline: Boolean, val isRead: Boolean = false)
-
 @Composable
-fun RecommendedCoachItem(coach: RecommendedCoach) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp)) {
-        Box(contentAlignment = Alignment.Center) {
-            val modifier = if (coach.hasStory) {
-                Modifier
-                    .size(64.dp)
-                    .border(2.dp, PrimaryBlue, CircleShape)
-                    .padding(4.dp)
-            } else {
-                Modifier.size(64.dp)
-            }
-
-            Box(
-                modifier = modifier
-                    .background(SurfaceDarkElevated, CircleShape)
-                    .clip(CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(coach.name.take(1), color = TextWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            }
-
-            if (coach.isOnline) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .background(Color(0xFF00E676), CircleShape)
-                        .border(2.dp, BackgroundDark, CircleShape)
-                        .align(Alignment.BottomEnd)
-                )
-            }
+fun RecommendedCoachItem(user: User, onChatClick: (String, String) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(76.dp)
+            .clickable { onChatClick(user.name, user.id) }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(SurfaceDarkElevated, CircleShape)
+                .clip(CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (user.name.isNotEmpty()) user.name.take(1) else "?",
+                color = TextWhite,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text(coach.name, color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            text = user.name,
+            color = TextWhite,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
 @Composable
-fun ChatItemRow(chat: ChatItem, onChatClick: (String) -> Unit) {
+fun ChatItemRow(
+    name: String,
+    id: String,
+    lastMessage: String,
+    time: String,
+    isUnread: Boolean,
+    onChatClick: (String, String) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onChatClick(chat.name) }
+            .clickable { onChatClick(name, id) }
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(SurfaceDarkElevated, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(chat.name.take(1), color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            }
-            if (chat.isOnline) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .background(Color(0xFF00E676), CircleShape)
-                        .border(2.dp, BackgroundDark, CircleShape)
-                        .align(Alignment.BottomEnd)
-                )
-            }
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .background(SurfaceDarkElevated, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (name.isNotEmpty()) name.take(1) else "?",
+                color = TextWhite,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Spacer(modifier = Modifier.width(16.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(chat.name, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text(chat.time, color = if (chat.unreadCount > 0) PrimaryBlue else TextGray, fontSize = 12.sp, fontWeight = if (chat.unreadCount > 0) FontWeight.Bold else FontWeight.Normal)
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (chat.isRead) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = chat.message,
-                    color = if (chat.unreadCount > 0) TextWhite else TextGray,
-                    fontSize = 14.sp,
+                    text = name,
+                    color = TextWhite,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    fontWeight = if (chat.unreadCount > 0) FontWeight.Bold else FontWeight.Normal
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = time,
+                    color = if (isUnread) PrimaryBlue else TextGray,
+                    fontSize = 12.sp,
+                    fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal
                 )
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = lastMessage,
+                color = if (isUnread) TextWhite else TextGray,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal
+            )
         }
 
-        if (chat.unreadCount > 0) {
-            Spacer(modifier = Modifier.width(12.dp))
+        // Синя крапка для нових повідомлень
+        if (isUnread) {
+            Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier
-                    .size(24.dp)
-                    .background(PrimaryBlue, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(chat.unreadCount.toString(), color = BackgroundDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
+                    .size(10.dp)
+                    .background(PrimaryBlue, CircleShape)
+            )
         }
+    }
+}
+
+@Composable
+fun ArchiveButton() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .background(SurfaceDarkElevated, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { /* TODO */ }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Default.Archive, contentDescription = null, tint = TextGray)
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "Архівні чати",
+            color = TextWhite,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextGray)
     }
 }

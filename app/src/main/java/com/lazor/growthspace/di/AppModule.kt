@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.lazor.growthspace.data.repository.AuthRepository
 import com.lazor.growthspace.data.repository.AuthRepositoryImpl
 import com.lazor.growthspace.ui.auth.AuthViewModel
+import com.lazor.growthspace.ui.chat.ChatViewModel
 import com.lazor.growthspace.ui.coach.CoachViewModel
 import com.lazor.growthspace.ui.home.HomeViewModel
 import com.lazor.growthspace.ui.profile.EditProfileViewModel
@@ -31,4 +32,5 @@ val appModule = module {
     viewModel { CoachViewModel(get()) }
     viewModel { ProgressViewModel(get(), get()) }
     viewModel { SessionsViewModel(get(), get()) }
+    viewModel { ChatViewModel(get(), get()) }
 }

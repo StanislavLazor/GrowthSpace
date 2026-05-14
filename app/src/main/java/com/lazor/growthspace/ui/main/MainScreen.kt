@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lazor.growthspace.navigation.Routes
 import com.lazor.growthspace.ui.chat.ChatListScreen
+import com.lazor.growthspace.ui.chat.ChatScreen
 import com.lazor.growthspace.ui.coach.*
 import com.lazor.growthspace.ui.components.BottomNavigationBar
 import com.lazor.growthspace.ui.home.HomeScreen
@@ -160,22 +161,27 @@ fun MainScreen(
 
             composable("chat") {
                 ChatListScreen(
-                    onChatClick = { coachName ->
-                        val encodedName = android.net.Uri.encode(coachName)
-                        navController.navigate("chat_room/$encodedName")
+                    onChatClick = { name, id ->
+                        val encodedName = android.net.Uri.encode(name)
+                        navController.navigate("chat_room/$encodedName/$id")
                     }
                 )
             }
 
             composable(
-                route = "chat_room/{coachName}",
-                arguments = listOf(navArgument("coachName") { type = NavType.StringType })
+                route = "chat_room/{coachName}/{coachId}",
+                arguments = listOf(
+                    navArgument("coachName") { type = NavType.StringType },
+                    navArgument("coachId") { type = NavType.StringType }
+                )
             ) { backStackEntry ->
-                val coachName = backStackEntry.arguments?.getString("coachName") ?: "Коуч"
-                com.lazor.growthspace.ui.chat.ChatScreen(
+                val coachName = backStackEntry.arguments?.getString("coachName") ?: "Чат"
+                val coachId = backStackEntry.arguments?.getString("coachId") ?: ""
+
+                ChatScreen(
                     coachName = coachName,
-                    onBackClick = { navController.popBackStack() },
-                    onProfileClick = { /* Додай перехід за потреби */ }
+                    coachId = coachId,
+                    onBackClick = { navController.popBackStack() }
                 )
             }
 
