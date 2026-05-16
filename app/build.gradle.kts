@@ -72,5 +72,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.5.0")
     // Firebase Storage
     implementation("com.google.firebase:firebase-storage-ktx")
+    // Відеодзвінки Jitsi Meet
+    implementation("org.jitsi.react:jitsi-meet-sdk:8.6.0")
 
 }

@@ -27,27 +27,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.data.model.SessionBooking
 import com.lazor.growthspace.ui.theme.*
+import com.lazor.growthspace.ui.components.launchVideoCall
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionsScreen(
     viewModel: SessionsViewModel = koinViewModel(),
-    onSessionClick: (String) -> Unit // ДОДАНО: Колбек для кліку по сесії
+    onSessionClick: (String) -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 - Майбутні, 1 - Минулі
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     val state by viewModel.state.collectAsState()
 
     val upcomingSessions = state.sessions.filter { it.status in listOf("pending", "confirmed", "available") }
-    val pastSessions = state.sessions.filter { it.status in listOf("completed", "cancelled", "canceled") } // Додав canceled на всяк випадок
+    val pastSessions = state.sessions.filter { it.status in listOf("completed", "cancelled", "canceled") }
 
     val isCoach = state.currentUser?.role == "coach"
+    // Отримуємо ім'я поточного користувача для відеочату
+    val currentUserName = state.currentUser?.name ?: "Користувач"
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -100,9 +104,10 @@ fun SessionsScreen(
                                     DynamicSessionCard(
                                         session = session,
                                         isCoach = isCoach,
+                                        currentUserName = currentUserName, // Передаємо ім'я
                                         onConfirm = { viewModel.updateSessionStatus(session.id, "confirmed") },
-                                        onCancel = { viewModel.updateSessionStatus(session.id, "canceled") }, // Використовуємо canceled як у БД
-                                        onClick = { onSessionClick(session.id) } // ПЕРЕДАЄМО КЛІК
+                                        onCancel = { viewModel.updateSessionStatus(session.id, "canceled") },
+                                        onClickDetails = { onSessionClick(session.id) }
                                     )
                                 }
                                 item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -115,9 +120,9 @@ fun SessionsScreen(
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 items(pastSessions) { session ->
                                     PastSessionCard(
-                                        session = session, // Передаємо цілий об'єкт для зручності
+                                        session = session,
                                         isCoach = isCoach,
-                                        onClick = { onSessionClick(session.id) } // ПЕРЕДАЄМО КЛІК
+                                        onClickDetails = { onSessionClick(session.id) }
                                     )
                                 }
                                 item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -158,10 +163,13 @@ fun getStatusColor(status: String): Color = when(status) {
 fun DynamicSessionCard(
     session: SessionBooking,
     isCoach: Boolean,
+    currentUserName: String, // Додано для Jitsi
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
-    onClick: () -> Unit // ДОДАНО
+    onClickDetails: () -> Unit // Перейменували для ясності
 ) {
+    val context = LocalContext.current // Отримуємо контекст для Jitsi
+
     val displayName = if (isCoach) {
         if (session.clientId.isEmpty()) "Вільний слот" else session.clientName
     } else {
@@ -180,8 +188,8 @@ fun DynamicSessionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp)) // Спочатку кліпаємо форму
-            .clickable { onClick() }         // Потім додаємо клік (щоб ефект натискання був у формі)
+            .clip(RoundedCornerShape(24.dp))
+            // ПРИБРАЛИ .clickable {} ЗВІДСИ
             .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
             .padding(16.dp)
     ) {
@@ -235,7 +243,6 @@ fun DynamicSessionCard(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
 
             if (isCoach && session.status == "pending") {
-                // Коуч: Запит від клієнта
                 OutlinedButton(
                     onClick = onCancel,
                     modifier = Modifier.weight(1f).height(48.dp),
@@ -258,32 +265,32 @@ fun DynamicSessionCard(
                     Text("Підтвердити", color = BackgroundDark, fontWeight = FontWeight.Bold)
                 }
             } else if (session.status == "confirmed") {
-                // Підтверджена сесія для обох
+
+                // ОНОВЛЕНІ КНОПКИ ДЛЯ ПІДТВЕРДЖЕНОЇ СЕСІЇ
                 OutlinedButton(
-                    onClick = { /* TODO: Відкрити чат напряму */ },
+                    onClick = onClickDetails, // КНОПКА ДЕТАЛЕЙ
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, SurfaceDarkElevated),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlue)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextWhite)
                 ) {
-                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Чат", fontWeight = FontWeight.Bold)
+                    Text("Деталі", fontWeight = FontWeight.Bold)
                 }
+
                 Button(
-                    onClick = onClick, // Відкриває деталі
+                    onClick = { launchVideoCall(context, currentUserName) }, // КНОПКА ВІДЕОЧАТУ
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)) // Зелений, як індикатор онлайну
                 ) {
                     Icon(Icons.Outlined.Videocam, contentDescription = null, tint = BackgroundDark, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Деталі", color = BackgroundDark, fontWeight = FontWeight.Bold)
+                    Text("Приєднатись", color = BackgroundDark, fontWeight = FontWeight.Bold)
                 }
+
             } else if (isCoach && session.status == "available") {
-                // Коуч бачить свій вільний слот
                 OutlinedButton(
-                    onClick = onCancel, // Видалення слоту
+                    onClick = onCancel,
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, SurfaceDarkElevated),
@@ -298,9 +305,9 @@ fun DynamicSessionCard(
 
 @Composable
 fun PastSessionCard(
-    session: SessionBooking, // ТЕПЕР ПРИЙМАЄ ЦІЛУ СЕСІЮ
+    session: SessionBooking,
     isCoach: Boolean,
-    onClick: () -> Unit // ДОДАНО
+    onClickDetails: () -> Unit // Перейменували
 ) {
     val name = if (isCoach) session.clientName else session.coachName
     val specialization = if (isCoach) "Клієнт" else "Коуч"
@@ -313,8 +320,8 @@ fun PastSessionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp)) // Спочатку кліпаємо форму
-            .clickable { onClick() }         // Потім додаємо клік
+            .clip(RoundedCornerShape(24.dp))
+            // ПРИБРАЛИ .clickable {} ЗВІДСИ ТАКОЖ
             .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
             .padding(16.dp)
     ) {
@@ -348,21 +355,22 @@ fun PastSessionCard(
 
         if (showRepeatButton) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onClick, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
-                    Text("Нотатки", color = TextWhite, fontWeight = FontWeight.Bold)
+                OutlinedButton(onClick = onClickDetails, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
+                    Text("Деталі", color = TextWhite, fontWeight = FontWeight.Bold)
                 }
-                OutlinedButton(onClick = { /* TODO: Повторити сесію (поки не реалізовано) */ }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
+                OutlinedButton(onClick = { /* TODO: Повторити сесію */ }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
                     Text("Повторити", color = TextWhite, fontWeight = FontWeight.Bold)
                 }
             }
         } else {
-            OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
+            OutlinedButton(onClick = onClickDetails, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SurfaceDarkElevated)) {
                 Text("Переглянути деталі", color = TextWhite, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
+// AnimatedTabSwitch залишається без змін
 @Composable
 fun AnimatedTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     BoxWithConstraints(
