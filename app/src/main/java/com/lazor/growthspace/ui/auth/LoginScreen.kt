@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,8 +15,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -34,25 +29,26 @@ fun LoginScreen(
     navController: NavController,
     viewModel: AuthViewModel = koinViewModel()
 ) {
-    // Стейт для полів
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isPasswordVisible by remember { mutableStateOf(false) }
 
     val authState by viewModel.authState.collectAsState()
     val context = LocalContext.current
 
-    // Логіка валідації Email
     val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
     val isEmailError = email.isNotEmpty() && !email.matches(emailRegex)
 
-    // ОБРОБКА РЕЗУЛЬТАТІВ ЛОГІНУ
+    // ОБРОБКА РЕЗУЛЬТАТІВ
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
                 navController.navigate(Routes.MAIN_APP) {
                     popUpTo(0) { inclusive = true }
                 }
+                viewModel.resetState()
+            }
+            is AuthState.PasswordResetSent -> {
+                Toast.makeText(context, "Лист для відновлення надіслано на ваш Email!", Toast.LENGTH_LONG).show()
                 viewModel.resetState()
             }
             is AuthState.Error -> {
@@ -63,10 +59,7 @@ fun LoginScreen(
         }
     }
 
-    // Обгортка Box для відображення завантаження поверх UI
     Box(modifier = Modifier.fillMaxSize()) {
-
-        // ТВІЙ ОРИГІНАЛЬНИЙ UI
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -76,7 +69,6 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(100.dp))
 
-            // Заголовки
             Text(
                 text = "З поверненням!",
                 color = TextWhite,
@@ -93,7 +85,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Поле Email
             CustomTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -112,16 +103,14 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Поле Пароль
             CustomTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = "Пароль",
-                isPassword = true, // Оце магічний перемикач, який активує логіку всередині
+                isPassword = true,
                 isError = false
             )
 
-            // Посилання "Забули пароль?"
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -134,14 +123,13 @@ fun LoginScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.clickable {
-                        // Якщо є такий роут: navController.navigate(Routes.FORGOT_PASSWORD)
+                        navController.navigate(Routes.FORGOT_PASSWORD)
                     }
                 )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Головна кнопка (ДОДАНО ВИКЛИК ЛОГІНУ)
             val isFormValid = email.isNotBlank() && !isEmailError && password.isNotBlank()
 
             PrimaryButton(
@@ -152,7 +140,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Посилання на реєстрацію
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -169,7 +156,6 @@ fun LoginScreen(
             }
         }
 
-        // ШАР ЗАВАНТАЖЕННЯ (додано)
         if (authState is AuthState.Loading) {
             Box(
                 modifier = Modifier

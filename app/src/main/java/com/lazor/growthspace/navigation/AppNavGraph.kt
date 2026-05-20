@@ -30,8 +30,7 @@ fun AppNavGraph() {
         // Екран відновлення пароля (залишаємо як було, поки не переписали його UI)
         composable(Routes.FORGOT_PASSWORD) {
             ForgotPasswordScreen(
-                onBackClick = { navController.popBackStack() },
-                onSendLinkClick = { email -> println("Відправлено на $email") }
+                onBackClick = { navController.popBackStack() }
             )
         }
 
