@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.data.model.SessionBooking
 import com.lazor.growthspace.ui.theme.*
 import com.lazor.growthspace.ui.components.launchVideoCall
-import com.lazor.growthspace.ui.components.UserAvatar // 🔥 Імпортували наш компонент!
+import com.lazor.growthspace.ui.components.UserAvatar
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -169,7 +169,6 @@ fun DynamicSessionCard(
 ) {
     val context = LocalContext.current
 
-    // 🔥 Беремо правильне ім'я та фото з моделі
     val displayName = session.getDisplayName(isCoach)
     val displayPhoto = session.getDisplayPhoto(isCoach)
 
@@ -192,7 +191,6 @@ fun DynamicSessionCard(
         // Хедер
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Row {
-                // 🔥 Інтегрований UserAvatar
                 Box(contentAlignment = Alignment.BottomEnd) {
                     UserAvatar(
                         photoUrl = displayPhoto,
@@ -316,7 +314,6 @@ fun PastSessionCard(
     isCoach: Boolean,
     onClickDetails: () -> Unit
 ) {
-    // 🔥 Беремо правильне ім'я та фото з моделі
     val displayName = session.getDisplayName(isCoach)
     val displayPhoto = session.getDisplayPhoto(isCoach)
 
@@ -336,7 +333,6 @@ fun PastSessionCard(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Row {
-                // 🔥 Інтегрований UserAvatar
                 UserAvatar(
                     photoUrl = displayPhoto,
                     name = displayName,

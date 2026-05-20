@@ -13,7 +13,7 @@ data class SessionBooking(
     val createdAt: Long = System.currentTimeMillis(),
     val notes: String = "",
     val privateNotes: String = "",
-    val photoUrl: String = "", // Залишаємо для зворотної сумісності зі старою БД
+    val photoUrl: String = "",
     val coachPhotoUrl: String? = null,
     val clientPhotoUrl: String? = null
 ) {
