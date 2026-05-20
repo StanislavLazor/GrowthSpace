@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.lazor.growthspace.data.model.SessionBooking
 import com.lazor.growthspace.ui.theme.*
 import com.lazor.growthspace.ui.components.launchVideoCall
+import com.lazor.growthspace.ui.components.UserAvatar
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +50,6 @@ fun SessionsScreen(
     val pastSessions = state.sessions.filter { it.status in listOf("completed", "cancelled", "canceled") }
 
     val isCoach = state.currentUser?.role == "coach"
-    // Отримуємо ім'я поточного користувача для відеочату
     val currentUserName = state.currentUser?.name ?: "Користувач"
 
     Scaffold(
@@ -104,7 +103,7 @@ fun SessionsScreen(
                                     DynamicSessionCard(
                                         session = session,
                                         isCoach = isCoach,
-                                        currentUserName = currentUserName, // Передаємо ім'я
+                                        currentUserName = currentUserName,
                                         onConfirm = { viewModel.updateSessionStatus(session.id, "confirmed") },
                                         onCancel = { viewModel.updateSessionStatus(session.id, "canceled") },
                                         onClickDetails = { onSessionClick(session.id) }
@@ -163,18 +162,15 @@ fun getStatusColor(status: String): Color = when(status) {
 fun DynamicSessionCard(
     session: SessionBooking,
     isCoach: Boolean,
-    currentUserName: String, // Додано для Jitsi
+    currentUserName: String,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
-    onClickDetails: () -> Unit // Перейменували для ясності
+    onClickDetails: () -> Unit
 ) {
-    val context = LocalContext.current // Отримуємо контекст для Jitsi
+    val context = LocalContext.current
 
-    val displayName = if (isCoach) {
-        if (session.clientId.isEmpty()) "Вільний слот" else session.clientName
-    } else {
-        session.coachName
-    }
+    val displayName = session.getDisplayName(isCoach)
+    val displayPhoto = session.getDisplayPhoto(isCoach)
 
     val specialization = if (isCoach) {
         if (session.clientId.isEmpty()) "Ніхто ще не записався" else "Клієнт"
@@ -189,20 +185,30 @@ fun DynamicSessionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            // ПРИБРАЛИ .clickable {} ЗВІДСИ
             .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
             .padding(16.dp)
     ) {
         // Хедер
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Row {
-                Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                    val initial = if (displayName.isNotEmpty() && displayName != "Вільний слот") displayName.take(1) else "?"
-                    Text(initial, color = TextWhite, fontWeight = FontWeight.Bold)
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    UserAvatar(
+                        photoUrl = displayPhoto,
+                        name = displayName,
+                        modifier = Modifier.size(48.dp)
+                    )
+
+                    // Зелений кружечок онлайну поверх аватарки
                     if (session.status == "confirmed") {
-                        Box(modifier = Modifier.size(12.dp).background(Color(0xFF00E676), CircleShape).border(2.dp, BackgroundDark, CircleShape).align(Alignment.BottomEnd))
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .background(Color(0xFF00E676), CircleShape)
+                                .border(2.dp, BackgroundDark, CircleShape)
+                        )
                     }
                 }
+
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(displayName, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -239,7 +245,7 @@ fun DynamicSessionCard(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ДИНАМІЧНІ КНОПКИ ЗАЛЕЖНО ВІД СТАТУСУ ТА РОЛІ
+        // ДИНАМІЧНІ КНОПКИ
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
 
             if (isCoach && session.status == "pending") {
@@ -266,9 +272,8 @@ fun DynamicSessionCard(
                 }
             } else if (session.status == "confirmed") {
 
-                // ОНОВЛЕНІ КНОПКИ ДЛЯ ПІДТВЕРДЖЕНОЇ СЕСІЇ
                 OutlinedButton(
-                    onClick = onClickDetails, // КНОПКА ДЕТАЛЕЙ
+                    onClick = onClickDetails,
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, SurfaceDarkElevated),
@@ -278,10 +283,10 @@ fun DynamicSessionCard(
                 }
 
                 Button(
-                    onClick = { launchVideoCall(context, currentUserName) }, // КНОПКА ВІДЕОЧАТУ
+                    onClick = { launchVideoCall(context, currentUserName) },
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)) // Зелений, як індикатор онлайну
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))
                 ) {
                     Icon(Icons.Outlined.Videocam, contentDescription = null, tint = BackgroundDark, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -307,9 +312,11 @@ fun DynamicSessionCard(
 fun PastSessionCard(
     session: SessionBooking,
     isCoach: Boolean,
-    onClickDetails: () -> Unit // Перейменували
+    onClickDetails: () -> Unit
 ) {
-    val name = if (isCoach) session.clientName else session.coachName
+    val displayName = session.getDisplayName(isCoach)
+    val displayPhoto = session.getDisplayPhoto(isCoach)
+
     val specialization = if (isCoach) "Клієнт" else "Коуч"
     val statusText = getStatusText(session.status)
     val isCancelled = session.status == "cancelled" || session.status == "canceled"
@@ -321,19 +328,20 @@ fun PastSessionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            // ПРИБРАЛИ .clickable {} ЗВІДСИ ТАКОЖ
             .border(1.dp, SurfaceDarkElevated, RoundedCornerShape(24.dp))
             .padding(16.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Row {
-                Box(modifier = Modifier.size(48.dp).background(SurfaceDark, CircleShape), contentAlignment = Alignment.Center) {
-                    val initial = if (name.isNotEmpty()) name.take(1) else "?"
-                    Text(initial, color = TextWhite, fontWeight = FontWeight.Bold)
-                }
+                UserAvatar(
+                    photoUrl = displayPhoto,
+                    name = displayName,
+                    modifier = Modifier.size(48.dp)
+                )
+
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(name, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(displayName, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Text(specialization, color = TextGray, fontSize = 14.sp)
                 }
             }
@@ -370,7 +378,6 @@ fun PastSessionCard(
     }
 }
 
-// AnimatedTabSwitch залишається без змін
 @Composable
 fun AnimatedTabSwitch(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     BoxWithConstraints(
