@@ -19,35 +19,27 @@ import com.lazor.growthspace.ui.theme.SurfaceDarkElevated
 
 @Composable
 fun UserAvatar(
-    photoUrl: String,
+    photoUrl: String?,
     name: String,
     modifier: Modifier = Modifier,
-    shape: Shape = CircleShape // За замовчуванням круглий, але можна змінити!
+    shape: Shape = CircleShape
 ) {
-    val finalImageUrl = if (photoUrl.isNotBlank()) {
-        photoUrl
-    } else if (name.isNotBlank()) {
-        "https://ui-avatars.com/api/?name=${name.replace(" ", "+")}&background=0D8ABC&color=fff&size=256"
-    } else {
-        ""
-    }
-
     Box(
         modifier = modifier
             .clip(shape)
             .background(SurfaceDarkElevated),
         contentAlignment = Alignment.Center
     ) {
-        if (finalImageUrl.isNotEmpty()) {
+        if (!photoUrl.isNullOrBlank() && photoUrl.startsWith("http")) {
             AsyncImage(
-                model = finalImageUrl,
-                contentDescription = "Аватар $name",
-                modifier = Modifier.fillMaxSize().clip(shape),
-                contentScale = ContentScale.Crop
+                model = photoUrl,
+                contentDescription = "Avatar $name",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
             )
         } else {
             Text(
-                text = name.take(1).uppercase(),
+                text = if (name.isNotBlank()) name.take(1).uppercase() else "?",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp
