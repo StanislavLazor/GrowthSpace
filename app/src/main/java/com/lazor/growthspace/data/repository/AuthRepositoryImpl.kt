@@ -20,31 +20,30 @@ class AuthRepositoryImpl @Inject constructor(
         isCoach: Boolean
     ): Result<User> {
         return try {
-            // 1. Реєстрація в Auth
+            // 1. Реєстрація в Firebase Authentication
             val authResult = auth.createUserWithEmailAndPassword(email, password).await()
             val userId = authResult.user?.uid ?: throw Exception("Не вдалося отримати UID користувача")
 
             val role = if (isCoach) "coach" else "client"
 
-            // 2. Створюємо Map для Firestore (це надійніше, ніж кидати об'єкт класу)
-            // Так ми точно знаємо, які ключі будуть у базі
+            // 2. Створення Map для Firestore (надійніше, ніж пряма передача об'єкта)
             val userMap = hashMapOf(
                 "id" to userId,
                 "name" to name,
                 "email" to email,
                 "role" to role,
-                "createdAt" to com.google.firebase.Timestamp.now() // Корисно для сортування пізніше
+                "createdAt" to com.google.firebase.Timestamp.now()
             )
 
-            // 3. Запис у базу
+            // 3. Запис даних користувача в базу даних
             usersCollection.document(userId).set(userMap).await()
 
-            // 4. Повертаємо об'єкт User для додатка
+            // 4. Повернення об'єкта User для додатка
             Result.success(User(id = userId, name = name, email = email, role = role))
 
         } catch (e: Exception) {
-            // Якщо Auth створився, а Firestore впав — видаляємо юзера з Auth,
-            // щоб він не висів "мертвим вантажем" без даних у БД
+            // Якщо обліковий запис в Auth створився, але запис у Firestore зірвався —
+            // видаляємо користувача з Auth, щоб уникнути незаповнених профілів
             if (auth.currentUser != null && e !is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
                 auth.currentUser?.delete()?.await()
             }
@@ -59,7 +58,7 @@ class AuthRepositoryImpl @Inject constructor(
 
             val document = usersCollection.document(userId).get().await()
 
-            // Використовуємо безпечне отримання полів, якщо toObject підведе
+            // Безпечне отримання полів на випадок збою автоматичного мапінгу
             val user = document.toObject(User::class.java) ?: User(
                 id = userId,
                 name = document.getString("name") ?: "Користувач",
@@ -68,6 +67,15 @@ class AuthRepositoryImpl @Inject constructor(
             )
 
             Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun resetPassword(email: String): Result<Unit> {
+        return try {
+            auth.sendPasswordResetEmail(email).await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
