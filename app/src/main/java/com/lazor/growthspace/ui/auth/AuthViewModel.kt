@@ -2,13 +2,11 @@ package com.lazor.growthspace.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
 import com.lazor.growthspace.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 sealed class AuthState {
     object Idle : AuthState()
@@ -57,12 +55,14 @@ class AuthViewModel(
             }
 
             _authState.value = AuthState.Loading
-            try {
-                // Викликаємо Firebase напряму для скидання пароля
-                FirebaseAuth.getInstance().sendPasswordResetEmail(email).await()
+
+            // Запит виконується строго через абстракцію репозиторію
+            val result = authRepository.resetPassword(email)
+
+            result.onSuccess {
                 _authState.value = AuthState.PasswordResetSent
-            } catch (e: Exception) {
-                _authState.value = AuthState.Error(e.localizedMessage ?: "Помилка відновлення пароля")
+            }.onFailure { error ->
+                _authState.value = AuthState.Error(error.message ?: "Помилка відновлення пароля")
             }
         }
     }
